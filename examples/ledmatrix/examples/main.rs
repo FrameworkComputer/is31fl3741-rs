@@ -3,7 +3,7 @@
 #![no_main]
 #![allow(clippy::needless_range_loop)]
 
-use embedded_hal::digital::v2::{InputPin, OutputPin};
+use embedded_hal::digital::{InputPin, OutputPin};
 //use rp2040_hal::{
 //    gpio::bank0::Gpio29,
 //};
