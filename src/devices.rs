@@ -1,12 +1,11 @@
 // #[cfg_attr(docsrs, doc(cfg(feature = "adafruit_rgb_13x9")))]
-#[allow(unused_imports)]
-use crate::{Error, IS31FL3741};
+use crate::{Is31Error, IS31FL3741};
 #[allow(unused_imports)]
 use core::convert::TryFrom;
 #[allow(unused_imports)]
-use embedded_hal::blocking::delay::DelayMs;
+use embedded_hal::delay::DelayUs;
 #[allow(unused_imports)]
-use embedded_hal::blocking::i2c::Write;
+use embedded_hal::i2c::{Error, I2c};
 
 #[cfg(feature = "adafruit_rgb_13x9")]
 pub struct AdafruitRGB13x9<I2C> {
@@ -17,9 +16,9 @@ pub struct AdafruitRGB13x9<I2C> {
 use embedded_graphics_core::{pixelcolor::Rgb888, prelude::*, primitives::Rectangle};
 
 #[cfg(all(feature = "adafruit_rgb_13x9", feature = "embedded_graphics"))]
-impl<I2C, I2cError> Dimensions for AdafruitRGB13x9<I2C>
+impl<I2C: I2c, I2cError: Error> Dimensions for AdafruitRGB13x9<I2C>
 where
-    I2C: Write<Error = I2cError>,
+    I2C: I2c<Error = I2cError>,
 {
     fn bounding_box(&self) -> Rectangle {
         Rectangle::new(Point::zero(), Size::new(13, 9))
@@ -27,13 +26,12 @@ where
 }
 
 #[cfg(all(feature = "adafruit_rgb_13x9", feature = "embedded_graphics"))]
-impl<I2C, I2cError> DrawTarget for AdafruitRGB13x9<I2C>
+impl<I2C: I2c, I2cError: Error> DrawTarget for AdafruitRGB13x9<I2C>
 where
-    I2C: Write<Error = I2cError>,
-    I2cError:,
+    I2C: I2c<Error = I2cError>,
 {
     type Color = Rgb888;
-    type Error = Error<I2cError>;
+    type Error = Is31Error<I2cError>;
 
     fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
     where
@@ -54,9 +52,9 @@ where
 }
 
 #[cfg(feature = "adafruit_rgb_13x9")]
-impl<I2C, I2cError> AdafruitRGB13x9<I2C>
+impl<I2C: I2c, I2cError: Error> AdafruitRGB13x9<I2C>
 where
-    I2C: Write<Error = I2cError>,
+    I2C: I2c<Error = I2cError>,
 {
     pub fn unwrap(self) -> I2C {
         self.device.i2c
@@ -204,7 +202,14 @@ where
         }
     }
 
-    pub fn pixel_rgb(&mut self, x: u8, y: u8, r: u8, g: u8, b: u8) -> Result<(), Error<I2cError>> {
+    pub fn pixel_rgb(
+        &mut self,
+        x: u8,
+        y: u8,
+        r: u8,
+        g: u8,
+        b: u8,
+    ) -> Result<(), Is31Error<I2cError>> {
         let x = x + y * 13;
         self.device.pixel(x, 2, r)?;
         self.device.pixel(x, 1, g)?;
@@ -212,11 +217,11 @@ where
         Ok(())
     }
 
-    pub fn setup<DEL: DelayMs<u8>>(&mut self, delay: &mut DEL) -> Result<(), Error<I2cError>> {
+    pub fn setup<DEL: DelayUs>(&mut self, delay: &mut DEL) -> Result<(), Is31Error<I2cError>> {
         self.device.setup(delay)
     }
 
-    pub fn fill_rgb(&mut self, r: u8, g: u8, b: u8) -> Result<(), Error<I2cError>> {
+    pub fn fill_rgb(&mut self, r: u8, g: u8, b: u8) -> Result<(), Is31Error<I2cError>> {
         for x in 0..13 {
             for y in 0..9 {
                 self.pixel_rgb(x, y, r, g, b)?;
