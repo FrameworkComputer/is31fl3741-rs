@@ -16,17 +16,17 @@ embedded-graphics-core = { optional = true, version = "0.4.0" }
 [package.metadata.docs.rs]
 all-features = true
 
-[dev-dependencies]
-cortex-m-rt = "0.7.3"
-cortex-m = "0.7.7"
-panic-halt = "0.2.0"
+#[dev-dependencies]
+#cortex-m-rt = "0.7.3"
+#cortex-m = "0.7.7"
+#panic-halt = "0.2.0"
 #stm32g0xx-hal = {version = "0.2.0", features = ["rt", "stm32g071"]}
 # TODO Split boards
 #rp-pico = "0.7.0"
-adafruit-qt-py-rp2040 = {version = "0.6.0", features = ["rt"]}
-tinybmp = "0.5.0"
-embedded-graphics = "0.8.1"
-fugit = "0.3.7"
+#adafruit-qt-py-rp2040 = {version = "0.6.0", features = ["rt"]}
+#tinybmp = "0.5.0"
+#embedded-graphics = "0.8.1"
+#fugit = "0.3.7"
 
 [features]
 adafruit_rgb_13x9 = []
@@ -40,7 +40,3 @@ default = ["adafruit_rgb_13x9", "embedded_graphics"]
 #[[example]]
 #name = "stm32-gaypride"
 #required-features = ["adafruit_rgb_13x9", "embedded_graphics"]
-
-[[example]]
-name = "qt-py-rp2040-matrix"
-required-features = ["adafruit_rgb_13x9"]
