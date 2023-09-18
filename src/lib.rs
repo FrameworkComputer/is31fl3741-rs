@@ -177,6 +177,40 @@ where
             ],
         )
     }
+
+    //pub fn check_open(&mut self, register: u8) -> Result<u8, I2cError> {
+    pub fn check_open<DEL: DelayMs<u8>>(
+        &mut self,
+        delay: &mut DEL,
+        register: u8,
+        open: bool,
+    ) -> Result<u8, I2cError> {
+        // Set low current before testing
+        self.write_register(Page::Config, addresses::CURRENT_REGISTER, 0x01)?;
+        if open {
+            self.write_register(Page::Config, addresses::PULL_UP_REGISTER, 0x00)?;
+        }
+        delay.delay_ms(10);
+
+        // Trigger detection
+        // OSDE 01 => open  detection
+        // OSDE 10 => short detection
+        let osde = if open { 0b010 } else { 0b100 };
+        let reg = self.read_register(Page::Config, addresses::CONFIG_REGISTER)?;
+        let reg = reg & (!0b110); // Clear OSDE
+        self.write_register(Page::Config, addresses::CONFIG_REGISTER, reg)?;
+        delay.delay_ms(100);
+        self.write_register(Page::Config, addresses::CONFIG_REGISTER, reg | osde)?;
+        delay.delay_ms(100);
+
+        // Read status
+        let status = self.read_register(Page::Config, register)?;
+
+        // Reset high current again
+        //self.write_register(Page::Config, addresses::CURRENT_REGISTER, 0xFF)?;
+        delay.delay_ms(10);
+        Ok(status)
+    }
 }
 
 /// See the [data sheet](https://lumissil.com/assets/pdf/core/IS31FL3741A_DS.pdf)
