@@ -18,5 +18,6 @@ all-features = true
 
 [features]
 adafruit_rgb_13x9 = []
+framework_ledmatrix = []
 embedded_graphics = ["embedded-graphics-core"]
-default = ["adafruit_rgb_13x9", "embedded_graphics"]
+default = ["adafruit_rgb_13x9", "framework_ledmatrix", "embedded_graphics"]
