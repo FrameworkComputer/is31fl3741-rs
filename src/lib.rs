@@ -3,9 +3,8 @@
 /// Preconfigured devices
 pub mod devices;
 
-use embedded_hal::blocking::delay::DelayMs;
-use embedded_hal::blocking::i2c::Read;
-use embedded_hal::blocking::i2c::Write;
+use embedded_hal::delay::DelayNs;
+use embedded_hal::i2c::{Error, I2c};
 
 /// A struct to integrate with a new IS31FL3741 powered device.
 pub struct IS31FL3741<I2C> {
@@ -23,10 +22,9 @@ pub struct IS31FL3741<I2C> {
     pub calc_pixel: fn(x: u8, y: u8) -> (u8, u8),
 }
 
-impl<I2C, I2cError> IS31FL3741<I2C>
+impl<I2C: I2c, I2cError: Error> IS31FL3741<I2C>
 where
-    I2C: Write<Error = I2cError>,
-    I2C: Read<Error = I2cError>,
+    I2C: I2c<Error = I2cError>,
 {
     /// Fill all pixels of the display at once. The brightness should range from 0 to 255.
     pub fn fill_matrix(&mut self, brightnesses: &[u8]) -> Result<(), I2cError> {
@@ -64,7 +62,7 @@ where
     /// 2. The chip will be put in shutdown mode
     /// 3. The chip will be configured to use the maximum voltage
     /// 4. The chip will be taken out of shutdown mode
-    pub fn setup<DEL: DelayMs<u8>>(&mut self, delay: &mut DEL) -> Result<(), Error<I2cError>> {
+    pub fn setup<DEL: DelayNs>(&mut self, delay: &mut DEL) -> Result<(), Is31Error<I2cError>> {
         self.reset(delay)?;
         self.shutdown(true)?;
         delay.delay_ms(10);
@@ -84,12 +82,12 @@ where
     /// Set the brightness at a specific x,y coordinate. Just like the [fill method](Self::fill)
     /// the brightness should range from 0 to 255. If the coordinate is out of range then the
     /// function will return an error of [InvalidLocation](Error::InvalidLocation).
-    pub fn pixel(&mut self, x: u8, y: u8, brightness: u8) -> Result<(), Error<I2cError>> {
+    pub fn pixel(&mut self, x: u8, y: u8, brightness: u8) -> Result<(), Is31Error<I2cError>> {
         if x > self.width {
-            return Err(Error::InvalidLocation(x));
+            return Err(Is31Error::InvalidLocation(x));
         }
         if y > self.height {
-            return Err(Error::InvalidLocation(y));
+            return Err(Is31Error::InvalidLocation(y));
         }
         let (pixel, frame) = (self.calc_pixel)(x, y);
         let bank = if frame == 0 { Page::Pwm1 } else { Page::Pwm2 };
@@ -106,7 +104,7 @@ where
     /// Send a reset message to the slave device. Delay is something that your device's HAL should
     /// provide which allows for the process to sleep for a certain amount of time (in this case 10
     /// MS to perform a reset).
-    pub fn reset<DEL: DelayMs<u8>>(&mut self, delay: &mut DEL) -> Result<(), I2cError> {
+    pub fn reset<DEL: DelayNs>(&mut self, delay: &mut DEL) -> Result<(), I2cError> {
         self.write_register(Page::Config, addresses::RESET_REGISTER, addresses::RESET)?;
         delay.delay_ms(10);
         Ok(())
@@ -207,15 +205,15 @@ pub mod addresses {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum Error<I2cError> {
+pub enum Is31Error<I2cError> {
     I2cError(I2cError),
     InvalidLocation(u8),
     InvalidFrame(u8),
 }
 
-impl<E> From<E> for Error<E> {
+impl<E> From<E> for Is31Error<E> {
     fn from(error: E) -> Self {
-        Error::I2cError(error)
+        Is31Error::I2cError(error)
     }
 }
 

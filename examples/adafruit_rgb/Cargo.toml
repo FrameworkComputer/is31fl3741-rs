@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 is31fl3741 = { path = "../../", features = [ "adafruit_rgb_13x9", "embedded_graphics" ] }
-embedded-hal = "0.2.7"
+embedded-hal = "1.0.0"
 cortex-m-rt = "0.7.3"
 cortex-m = "0.7.7"
 fugit = "0.3.7"
