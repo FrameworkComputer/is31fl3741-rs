@@ -12,7 +12,6 @@ Driver for [Lumissil Microsystem's IS31FL3741 integrated circuit](https://www.lu
 1. Use of embedded HAL traits (works with any embedded device that supports the required traits). This means that this driver is platform agnostic.
 2. Library features (only turn on what devices you need to save compiled binary space).
 3. [Examples](./examples) on how to use this driver.
-Right now there is only an example on how to use this crate with a stm32 nucleo.
 
 ## Install
 

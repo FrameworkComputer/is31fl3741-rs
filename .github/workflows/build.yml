@@ -26,8 +26,8 @@ jobs:
       - if: steps.changes.outputs.rust == 'true'
         run: |
           cargo build --target=thumbv6m-none-eabi
-          cd examples/adafruit_rgb
-          cargo build --target=thumbv6m-none-eabi
+          cd examples/adafruit_rgb && cargo build --target=thumbv6m-none-eabi
+          cd examples/ledmatrix && cargo build --target=thumbv6m-none-eabi
 
   rustdoc:
     runs-on: ubuntu-latest
