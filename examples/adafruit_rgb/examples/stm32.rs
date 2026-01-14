@@ -45,7 +45,7 @@ fn main() -> ! {
                 matrix
                     .pixel_rgb(x, y, 0x1E, 0x90, 0xFF)
                     .expect("couldn't turn on");
-                delay.delay_ms(100u8);
+                delay.delay_ms(100_u32);
                 matrix.pixel_rgb(x, y, 0, 0, 0).expect("couldn't turn off");
             }
         }

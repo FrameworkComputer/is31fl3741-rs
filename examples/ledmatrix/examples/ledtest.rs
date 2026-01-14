@@ -8,7 +8,7 @@
 #![no_main]
 #![allow(clippy::needless_range_loop)]
 
-use embedded_hal::digital::v2::{InputPin, OutputPin};
+use embedded_hal::digital::{InputPin, OutputPin};
 use rp2040_hal::rom_data::reset_to_usb_boot;
 use rp2040_panic_usb_boot as _;
 
