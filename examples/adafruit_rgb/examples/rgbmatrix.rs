@@ -1,6 +1,6 @@
-//! Adafruit RGB 13x9 Matrix - Pride Flag Example for QT Py RP2040
+//! Adafruit RGB 13x9 Matrix Example for QT Py RP2040
 //!
-//! Displays a pride flag image on the Adafruit IS31FL3741 RGB matrix.
+//! Lights up each LED one by one on the Adafruit IS31FL3741 RGB matrix.
 //! Connect the matrix to the STEMMA QT connector on the QT Py RP2040.
 //!
 //! STEMMA QT pinout on QT Py RP2040:
@@ -11,7 +11,7 @@
 
 use panic_halt as _;
 
-use embedded_graphics::{image::Image, pixelcolor::Rgb888, prelude::*};
+use embedded_hal::delay::DelayNs;
 use fugit::RateExtU32;
 use rp2040_hal::{
     self as hal,
@@ -23,7 +23,6 @@ use rp2040_hal::{
     watchdog::Watchdog,
     Timer, I2C,
 };
-use tinybmp::Bmp;
 
 use is31fl3741::devices::AdafruitRGB13x9;
 
@@ -82,11 +81,16 @@ fn main() -> ! {
 
     matrix.set_scaling(0xFF).expect("failed to set scaling");
 
-    let bmp_data = include_bytes!("gaypride.bmp");
-    let bmp = Bmp::<Rgb888>::from_slice(bmp_data).unwrap();
-    Image::new(&bmp, Point::zero()).draw(&mut matrix).unwrap();
-
     loop {
-        cortex_m::asm::wfi();
+        // Light up each LED one by one
+        for y in 0..9 {
+            for x in 0..13 {
+                matrix
+                    .pixel_rgb(x, y, 0x1E, 0x90, 0xFF)
+                    .expect("couldn't turn on");
+                delay.delay_ms(100);
+                matrix.pixel_rgb(x, y, 0, 0, 0).expect("couldn't turn off");
+            }
+        }
     }
 }

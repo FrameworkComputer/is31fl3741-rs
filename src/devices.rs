@@ -4,11 +4,9 @@ use crate::{Error, IS31FL3741};
 #[allow(unused_imports)]
 use core::convert::TryFrom;
 #[allow(unused_imports)]
-use embedded_hal::blocking::delay::DelayMs;
+use embedded_hal::delay::DelayNs;
 #[allow(unused_imports)]
-use embedded_hal::blocking::i2c::Read;
-#[allow(unused_imports)]
-use embedded_hal::blocking::i2c::Write;
+use embedded_hal::i2c::I2c;
 
 #[cfg(feature = "adafruit_rgb_13x9")]
 pub struct AdafruitRGB13x9<I2C> {
@@ -19,25 +17,16 @@ pub struct AdafruitRGB13x9<I2C> {
 use embedded_graphics_core::{pixelcolor::Rgb888, prelude::*, primitives::Rectangle};
 
 #[cfg(all(feature = "adafruit_rgb_13x9", feature = "embedded_graphics"))]
-impl<I2C, I2cError> Dimensions for AdafruitRGB13x9<I2C>
-where
-    I2C: Write<Error = I2cError>,
-    I2C: Read<Error = I2cError>,
-{
+impl<I2C: I2c> Dimensions for AdafruitRGB13x9<I2C> {
     fn bounding_box(&self) -> Rectangle {
         Rectangle::new(Point::zero(), Size::new(13, 9))
     }
 }
 
 #[cfg(all(feature = "adafruit_rgb_13x9", feature = "embedded_graphics"))]
-impl<I2C, I2cError> DrawTarget for AdafruitRGB13x9<I2C>
-where
-    I2C: Write<Error = I2cError>,
-    I2C: Read<Error = I2cError>,
-    I2cError:,
-{
+impl<I2C: I2c> DrawTarget for AdafruitRGB13x9<I2C> {
     type Color = Rgb888;
-    type Error = Error<I2cError>;
+    type Error = Error<I2C::Error>;
 
     fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
     where
@@ -58,16 +47,12 @@ where
 }
 
 #[cfg(feature = "adafruit_rgb_13x9")]
-impl<I2C, I2cError> AdafruitRGB13x9<I2C>
-where
-    I2C: Write<Error = I2cError>,
-    I2C: Read<Error = I2cError>,
-{
+impl<I2C: I2c> AdafruitRGB13x9<I2C> {
     pub fn unwrap(self) -> I2C {
         self.device.i2c
     }
 
-    pub fn set_scaling(&mut self, scale: u8) -> Result<(), I2cError> {
+    pub fn set_scaling(&mut self, scale: u8) -> Result<(), I2C::Error> {
         self.device.set_scaling(scale)
     }
 
@@ -209,7 +194,14 @@ where
         }
     }
 
-    pub fn pixel_rgb(&mut self, x: u8, y: u8, r: u8, g: u8, b: u8) -> Result<(), Error<I2cError>> {
+    pub fn pixel_rgb(
+        &mut self,
+        x: u8,
+        y: u8,
+        r: u8,
+        g: u8,
+        b: u8,
+    ) -> Result<(), Error<I2C::Error>> {
         let x = x + y * 13;
         self.device.pixel(x, 2, r)?;
         self.device.pixel(x, 1, g)?;
@@ -217,11 +209,11 @@ where
         Ok(())
     }
 
-    pub fn setup<DEL: DelayMs<u8>>(&mut self, delay: &mut DEL) -> Result<(), Error<I2cError>> {
+    pub fn setup<DEL: DelayNs>(&mut self, delay: &mut DEL) -> Result<(), Error<I2C::Error>> {
         self.device.setup(delay)
     }
 
-    pub fn fill_rgb(&mut self, r: u8, g: u8, b: u8) -> Result<(), Error<I2cError>> {
+    pub fn fill_rgb(&mut self, r: u8, g: u8, b: u8) -> Result<(), Error<I2C::Error>> {
         for x in 0..13 {
             for y in 0..9 {
                 self.pixel_rgb(x, y, r, g, b)?;
@@ -556,17 +548,13 @@ pub struct LedMatrix<I2C> {
 }
 
 #[cfg(feature = "framework_ledmatrix")]
-impl<I2C, I2cError> LedMatrix<I2C>
-where
-    I2C: Write<Error = I2cError>,
-    I2C: Read<Error = I2cError>,
-{
+impl<I2C: I2c> LedMatrix<I2C> {
     pub fn unwrap(self) -> I2C {
         self.device.i2c
     }
 
     // TODO: Maybe make this private and set it once in the constructor
-    pub fn set_scaling(&mut self, scale: u8) -> Result<(), I2cError> {
+    pub fn set_scaling(&mut self, scale: u8) -> Result<(), I2C::Error> {
         self.device.set_scaling(scale)
     }
 
@@ -582,14 +570,14 @@ where
         }
     }
 
-    pub fn setup<DEL: DelayMs<u8>>(&mut self, delay: &mut DEL) -> Result<(), Error<I2cError>> {
+    pub fn setup<DEL: DelayNs>(&mut self, delay: &mut DEL) -> Result<(), Error<I2C::Error>> {
         self.device.setup(delay)?;
         Ok(())
     }
 
     /// Fills the matrix with a _raw_ brightness value, i.e. without gamma
     /// correction, to show the native PWM values.
-    pub fn fill_brightness(&mut self, brightness: u8) -> Result<(), Error<I2cError>> {
+    pub fn fill_brightness(&mut self, brightness: u8) -> Result<(), Error<I2C::Error>> {
         for x in 0..self.device.width {
             for y in 0..self.device.height {
                 self.device.pixel(x, y, brightness)?;
