@@ -41,6 +41,6 @@ The `adafruit_rgb/gaypride` example shows off a use of this.
 ## Inspiration
 
 This driver is ~~ripped off~~ modified from [gleich](https://github.com/gleich/)'s [is31fl3731 crate](https://github.com/gleich/is31fl3731).
-I was originally planning on just making a PR, but the driver ended up too differet.
+I was originally planning on just making a PR, but the driver ended up too different.
 
 That driver is a port of [adafruit's driver for the is31fl3731](https://github.com/adafruit/Adafruit_CircuitPython_IS31FL3731) in the Rust programming language.
