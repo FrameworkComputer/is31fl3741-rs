@@ -4,7 +4,6 @@
 [![lint](https://github.com/FrameworkComputer/is31fl3741-rs/actions/workflows/lint.yml/badge.svg)](https://github.com/FrameworkComputer/is31fl3741-rs/actions/workflows/lint.yml)
 [![build](https://github.com/FrameworkComputer/is31fl3741-rs/actions/workflows/build.yml/badge.svg)](https://github.com/FrameworkComputer/is31fl3741-rs/actions/workflows/build.yml)
 
-
 # is31fl3741 driver
 
 Driver for [Lumissil Microsystem's IS31FL3741 integrated circuit](https://www.lumissil.com/assets/pdf/core/IS31FL3741_DS.pdf). Some of the major features of this library are:
@@ -18,7 +17,7 @@ Driver for [Lumissil Microsystem's IS31FL3741 integrated circuit](https://www.lu
 To install this driver in your project add the following line to your `Cargo.toml`'s `dependencies` table:
 
 ```toml
-is31fl3741 = "0.4.0"
+is31fl3741 = "0.5.0"
 ```
 
 By default this version will only contain the core driver.
@@ -41,6 +40,8 @@ The `adafruit_rgb/gaypride` example shows off a use of this.
 ## Inspiration
 
 This driver is ~~ripped off~~ modified from [gleich](https://github.com/gleich/)'s [is31fl3731 crate](https://github.com/gleich/is31fl3731).
-I was originally planning on just making a PR, but the driver ended up too different.
+@stillinbeta was originally planning on just making a PR, but the driver ended up too different.
 
 That driver is a port of [adafruit's driver for the is31fl3731](https://github.com/adafruit/Adafruit_CircuitPython_IS31FL3731) in the Rust programming language.
+
+Then @JohnAZoidberg took over maintenance of the package.
