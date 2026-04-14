@@ -1,6 +1,6 @@
 [package] 
 name = "is31fl3741"
-version = "0.4.0"
+version = "0.5.1"
 edition = "2021"
 authors = ["Liz Frost", "Daniel Schaefer"]
 categories = ["embedded", "no-std"]
@@ -11,7 +11,7 @@ readme = "README.md"
 
 [dependencies]
 embedded-hal = "1.0"
-embedded-graphics-core = { optional = true, version = "0.4.0" }
+embedded-graphics-core = { optional = true, version = "0.4.1" }
 
 [package.metadata.docs.rs]
 all-features = true

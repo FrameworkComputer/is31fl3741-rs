@@ -18,7 +18,7 @@ Driver for [Lumissil Microsystem's IS31FL3741 integrated circuit](https://www.lu
 To install this driver in your project add the following line to your `Cargo.toml`'s `dependencies` table:
 
 ```toml
-is31fl3741 = "0.4.0"
+is31fl3741 = "0.5.1"
 ```
 
 By default this version will only contain the core driver.
@@ -27,8 +27,8 @@ To use a preconfigured device ([Framework LED Matrix](https://frame.work/tw/en/p
 you would need to change this line to include that device:
 
 ```toml
-is31fl3741 = { version = "0.4.0", features = ["framework_ledmatrix"] }
-is31fl3741 = { version = "0.4.0", features = ["adafruit_rgb_13x9"] }
+is31fl3741 = { version = "0.5.1", features = ["framework_ledmatrix"] }
+is31fl3741 = { version = "0.5.1", features = ["adafruit_rgb_13x9"] }
 ```
 
 ## Graphics
