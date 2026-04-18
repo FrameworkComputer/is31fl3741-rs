@@ -220,7 +220,7 @@ impl<E> From<E> for Error<E> {
 }
 
 #[repr(u8)]
-pub enum Page {
+enum Page {
     Pwm1 = 0x00,
     Pwm2 = 0x01,
     Scale1 = 0x02,
