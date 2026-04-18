@@ -142,6 +142,11 @@ impl<I2C: I2c> IS31FL3741<I2C> {
         self.write_register(Page::Config, addresses::PWM_FREQ_REGISTER, pwm as u8)
     }
 
+    /// Set the global current
+    pub fn set_global_current(&mut self, current: u8) -> Result<(), I2C::Error> {
+        self.write_register(Page::Config, addresses::CURRENT_REGISTER, current)
+    }
+
     fn write(&mut self, buf: &[u8]) -> Result<(), I2C::Error> {
         self.i2c.write(self.address, buf)
     }
@@ -215,7 +220,7 @@ impl<E> From<E> for Error<E> {
 }
 
 #[repr(u8)]
-enum Page {
+pub enum Page {
     Pwm1 = 0x00,
     Pwm2 = 0x01,
     Scale1 = 0x02,
