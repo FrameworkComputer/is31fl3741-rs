@@ -188,3 +188,13 @@ fn interrupt_status_regression() {
     assert!(!status.short);
     assert_eq!(device.i2c.writes, [vec![0xf1]]);
 }
+
+#[test]
+fn logic_threshold_regression() {
+    let mut device = driver();
+    device.i2c.read_value = 0x11;
+    device
+        .set_logic_threshold(is31fl3741::LogicThreshold::High2V4Low0V6)
+        .unwrap();
+    assert_eq!(device.i2c.writes.last().unwrap(), &[0, 0x19]);
+}
