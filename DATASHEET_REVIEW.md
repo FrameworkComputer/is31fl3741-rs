@@ -161,7 +161,8 @@ Settle these before expanding the API surface or changing existing caller behavi
 
   **Automated:** Assert the documented setup postcondition: either all 351 scaling values are initialized, or setup leaves them zero and the documented example explicitly sets them. **Hardware:** From reset, run setup, apply a modest PWM pattern, then set scaling. Confirm behavior matches the selected contract. Repeat setup after changing settings to verify reset behavior, not just cold boot.
 
-- [ ] **Remove or explain `addresses::SHUTDOWN = 0x0A`.**
+- [x] **Remove or explain `addresses::SHUTDOWN = 0x0A`.**
+  **Status:** Explained as a misleading legacy constant, retaining the existing value and source compatibility without adding a deprecation warning. Documentation directs callers to `shutdown()`, which uses configuration bit 0. Any future removal remains a separate compatibility decision. Baseline source search found no Rust uses; before/after documentation builds pass and rustdoc link resolves. No runtime change or new hardware test.
   **Decision:** Remove a misleading public constant in a breaking release, deprecate it, or retain it with an explanation?
 
   It is unused and does not correspond to a shutdown register in this datasheet. Software shutdown is configuration bit 0 in PG4 `0x00`.

@@ -274,6 +274,11 @@ pub mod addresses {
     pub const PULL_UP_REGISTER: u8 = 0x02;
     pub const PWM_FREQ_REGISTER: u8 = 0x36;
     pub const RESET_REGISTER: u8 = 0x3F;
+    /// Legacy constant retained for source compatibility.
+    ///
+    /// `0x0A` is not a shutdown register on IS31FL3741A. Software shutdown is
+    /// bit 0 of the page-4 configuration register; use
+    /// [`IS31FL3741::shutdown`](crate::IS31FL3741::shutdown) instead.
     pub const SHUTDOWN: u8 = 0x0A;
 
     pub const PAGE_SELECT_REGISTER: u8 = 0xFD;
