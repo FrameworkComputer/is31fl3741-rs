@@ -11,7 +11,7 @@ pub struct IS31FL3741<I2C> {
     /// The i2c bus that is used to interact with the device. See implementation below for the
     /// trait methods required.
     pub i2c: I2C,
-    /// The 7-bit i2c slave address of the device. By default on most devices this is `0x74`.
+    /// The 7-bit i2c slave address of the device. Valid addresses are `0x30` through `0x33`, selected by the ADDR pin.
     pub address: u8,
     /// Width of the LED matrix
     pub width: u8,
