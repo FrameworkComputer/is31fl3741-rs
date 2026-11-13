@@ -159,3 +159,15 @@ fn global_current_regression() {
     device.set_global_current(128).unwrap();
     assert_eq!(device.i2c.writes.last().unwrap(), &[1, 128]);
 }
+
+#[test]
+fn deghost_resistors_regression() {
+    let mut device = driver();
+    device
+        .set_deghost_resistors(
+            is31fl3741::Resistor::KiloOhms32,
+            is31fl3741::Resistor::Ohms500,
+        )
+        .unwrap();
+    assert_eq!(device.i2c.writes.last().unwrap(), &[2, 0x71]);
+}
