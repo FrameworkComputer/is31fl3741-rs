@@ -152,3 +152,10 @@ fn address_change_targets_subsequent_transactions() {
     device.pixel(0, 0, 42).unwrap();
     assert_eq!(device.i2c.transactions, 3);
 }
+
+#[test]
+fn global_current_regression() {
+    let mut device = driver();
+    device.set_global_current(128).unwrap();
+    assert_eq!(device.i2c.writes.last().unwrap(), &[1, 128]);
+}
