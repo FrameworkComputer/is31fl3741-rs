@@ -120,3 +120,28 @@ fn graphics_discards_out_of_bounds_pixels() {
         .unwrap();
     assert!(device.device.i2c.writes.is_empty());
 }
+
+#[test]
+fn fill_matrix_sends_every_channel_in_order() {
+    let mut device = driver();
+    let values: Vec<u8> = (0..351).map(|n| (n % 251) as u8).collect();
+    device.fill_matrix(&values).unwrap();
+    assert_eq!(device.i2c.writes[1], [0xfd, 0]);
+    assert_eq!(device.i2c.writes[2][0], 0);
+    assert_eq!(device.i2c.writes[2][1..], values[..180]);
+    assert_eq!(device.i2c.writes[4], [0xfd, 1]);
+    assert_eq!(device.i2c.writes[5][0], 0);
+    assert_eq!(device.i2c.writes[5][1..], values[180..]);
+}
+
+#[test]
+fn short_frame_panics_before_bus_access() {
+    for length in [0, 179, 180, 350] {
+        let mut device = driver();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            device.fill_matrix(&vec![0; length]).unwrap();
+        }));
+        assert!(result.is_err());
+        assert!(device.i2c.writes.is_empty());
+    }
+}

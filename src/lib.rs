@@ -23,8 +23,16 @@ pub struct IS31FL3741<I2C> {
 }
 
 impl<I2C: I2c> IS31FL3741<I2C> {
-    /// Fill all pixels of the display at once. The brightness should range from 0 to 255.
+    /// Fill all 351 hardware channels in register order (180 on page one, 171 on page two).
+    /// Extra values are ignored. Each brightness ranges from 0 to 255.
+    ///
+    /// # Panics
+    /// Panics before any I2C access if fewer than 351 values are provided.
     pub fn fill_matrix(&mut self, brightnesses: &[u8]) -> Result<(), I2C::Error> {
+        assert!(
+            brightnesses.len() >= 351,
+            "fill_matrix requires at least 351 brightness values"
+        );
         // Extend by one, to add address to the beginning
         let mut buf = [0x00; 0xB5];
         buf[0] = 0x00; // set the initial address
@@ -35,7 +43,7 @@ impl<I2C: I2c> IS31FL3741<I2C> {
 
         buf[1..=0xAB].copy_from_slice(&brightnesses[0xB4..=0xB4 + 0xAA]);
         self.bank(Page::Pwm2)?;
-        self.write(&buf[..=0xAA])?;
+        self.write(&buf[..=0xAB])?;
         Ok(())
     }
 
