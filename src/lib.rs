@@ -18,7 +18,8 @@ pub struct IS31FL3741<I2C> {
     /// Height of the LED matrix
     pub height: u8,
     /// Method to convert an x,y coordinate pair to a binary address that can be accessed using the
-    /// bus. second value is the page the LED is on
+    /// bus. The second value is the PWM page: 0 or 1. Other values produce
+    /// [`Error::InvalidFrame`] without accessing the bus.
     pub calc_pixel: fn(x: u8, y: u8) -> (u8, u8),
 }
 
@@ -93,6 +94,8 @@ impl<I2C: I2c> IS31FL3741<I2C> {
     /// Set the brightness at a specific x,y coordinate. Just like the [fill method](Self::fill)
     /// the brightness should range from 0 to 255. If the coordinate is out of range then the
     /// function will return an error of [InvalidLocation](Error::InvalidLocation).
+    /// A mapping callback returning a page other than 0 or 1 produces
+    /// [`Error::InvalidFrame`] before any I2C access.
     pub fn pixel(&mut self, x: u8, y: u8, brightness: u8) -> Result<(), Error<I2C::Error>> {
         if x >= self.width {
             return Err(Error::InvalidLocation(x));
@@ -101,7 +104,11 @@ impl<I2C: I2c> IS31FL3741<I2C> {
             return Err(Error::InvalidLocation(y));
         }
         let (pixel, frame) = (self.calc_pixel)(x, y);
-        let bank = if frame == 0 { Page::Pwm1 } else { Page::Pwm2 };
+        let bank = match frame {
+            0 => Page::Pwm1,
+            1 => Page::Pwm2,
+            invalid => return Err(Error::InvalidFrame(invalid)),
+        };
         self.write_register(bank, pixel, brightness)?;
         Ok(())
     }

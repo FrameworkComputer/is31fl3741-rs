@@ -170,3 +170,8 @@ have a 30-second timeout. The later longer-exposure run used crop
 sets GCC255/config1, and an explicit scaling50 call sets all 351 scaling bytes.
 It snapshots and restores the full original state even when the check fails.
 This documents existing startup behavior, not a new automatic scaling default.
+
+`V` checks malformed mapping callbacks returning pages 2 and 255. It expects
+`InvalidFrame`, verifies unchanged PWM, and restores the original callback/state.
+Valid mapping pages are 0 and 1. This is a regression for an earlier driver that
+silently coerced every nonzero mapping page to PWM page1.

@@ -157,6 +157,7 @@ fn main() -> ! {
                         | b'E'
                         | b'Q'
                         | b'U'
+                        | b'V'
                 ) {
                     let commands: &[u8] = if byte == b'A' {
                         b"GRLMI"
@@ -178,6 +179,8 @@ fn main() -> ! {
                                     &mut intb,
                                     &mut timed_report,
                                 )
+                            } else if command == b'V' {
+                                check_invalid_mapping(&mut matrix.device)
                             } else if command == b'U' {
                                 observe_setup(&mut matrix.device, &mut delay)
                             } else if command == b'P' {
@@ -239,6 +242,7 @@ fn main() -> ! {
                                 timed_report.as_bytes()
                             }
                             Ok(()) => match command {
+                                b'V' => b"PASS: invalid mapping pages rejected; state restored\r\n",
                                 b'U' => b"PASS: setup zero PWM/scaling; explicit scaling; state restored\r\n",
                                 b'0' => b"PASS: optical uniform GCC0; held\r\n",
                                 b'1' => b"PASS: optical uniform GCC16; held\r\n",
@@ -724,6 +728,34 @@ fn observe_setup<I: embedded_hal::i2c::I2c, D: DelayNs>(
         }
         Ok(())
     })();
+    saved.restore(d)?;
+    result
+}
+
+fn check_invalid_mapping<I: embedded_hal::i2c::I2c>(
+    d: &mut is31fl3741::IS31FL3741<I>,
+) -> Result<(), &'static str> {
+    let saved = Snapshot::capture(d)?;
+    let mapping = d.calc_pixel;
+    let result = (|| {
+        for (page, callback) in [
+            (2, (|_, _| (0, 2)) as fn(u8, u8) -> (u8, u8)),
+            (255, (|_, _| (0, 255)) as fn(u8, u8) -> (u8, u8)),
+        ] {
+            d.calc_pixel = callback;
+            let result = d.pixel(0, 0, 123);
+            d.calc_pixel = mapping;
+            if !matches!(result,Err(is31fl3741::Error::InvalidFrame(v)) if v==page) {
+                return Err("FAIL: invalid mapping page accepted\r\n");
+            }
+        }
+        let after = Snapshot::capture(d)?;
+        if after.pwm != saved.pwm {
+            return Err("FAIL: invalid mapping changed PWM\r\n");
+        }
+        Ok(())
+    })();
+    d.calc_pixel = mapping;
     saved.restore(d)?;
     result
 }

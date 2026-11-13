@@ -176,3 +176,18 @@ After documenting that existing contract, U repeated three times successfully,
 then T and all five A reports passed. Full state was restored after each request.
 Documentation build and strict release diagnostic Clippy/build passed. No startup
 default was changed and no claim is made that a functional bug was fixed here.
+
+## Invalid mapping-page regression
+
+Baseline driver `f5f6f49` with V diagnostic: host regression failed on page2;
+three hardware V requests returned `FAIL: invalid mapping page accepted`.
+The callback and full register state were restored after each failed request.
+The fixed driver rejects all pages2–255 using existing InvalidFrame before any
+I²C access. Exhaustive host test confirms zero transactions. Hardware V checks
+pages2 and255 plus unchanged PWM: three requests and one additional request pass.
+T, five A reports, and U pass afterward. All six workflow test commands pass
+locally (26 all-feature debug/release, 22 core-only, 23 Framework, 24 Adafruit,
+25 Adafruit+graphics); strict host and release-diagnostic Clippy, docs, format,
+and whitespace checks pass. Rebuilt/restored normal updated ledtest; bootloader
+volume was explicitly mounted after desktop automount delay and application
+serial enumeration confirmed. No new optical/timing claim for this change.

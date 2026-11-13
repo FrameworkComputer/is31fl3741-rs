@@ -73,6 +73,9 @@ Small, focused changes with existing APIs and clear regression cases.
 
   **Automated:** Accept `(0,0)` and `(12,8)` and check their three mapped channel writes. Reject `(13,0)`, `(0,9)`, and inputs containing 255 without any I²C writes. Run in debug and release to catch arithmetic differences. Check that invalid `(13,0)` never updates valid `(0,1)`. **Hardware:** Adafruit-specific; no additional Framework test is needed.
 
+- [x] **Reject unsupported PWM pages from custom mapping callbacks.**
+  **Status:** Newly found during follow-up. Baseline host test fails on page2 and hardware V fails three requests because every nonzero page is silently mapped to page1. Fixed `pixel()` returns the existing `InvalidFrame` error for pages2–255 before I²C access. Exhaustive host invalid-page test passes with zero transactions; hardware V tests pages2/255 and passes three requests plus a repeat, with unchanged PWM and restored callback/state. T, five A reports, and U pass afterward. All six workflow test commands pass (26 all-feature debug/release, 22 core-only, 23 Framework, 24 Adafruit, 25 Adafruit+graphics); strict host/diagnostic Clippy, docs, and formatting pass. Normal updated ledtest restored and serial enumeration confirmed. Valid page0/page1 mappings are unchanged.
+
 ### Documentation corrections
 
 No behavioral decision is needed for these wording fixes.
@@ -267,3 +270,19 @@ Transaction counts are source-level estimates, not measured speedups. Resolve co
 
 - [x] Reject off-target camera evidence automatically and repeat de-ghost comparison at longer exposure. Baseline script completed an outdated-crop run despite nearly black lit frames; new visibility guard rejected it (exit1) and restored state. Corrected-crop 50ms run completed seven settings. No conclusive electronic ghosting difference was established. Evidence/limits are in the longer-exposure results directory; matrix T/A and camera-restoration checks pass, and normal firmware is restored.
 - [x] Add independent device-feature coverage and fixture-change CI triggers. Baseline workflow covered all-features/no-default only and did not list CSV fixtures in its path filters; three standalone device test commands already passed locally. Revised workflow includes Framework-only, Adafruit-only, and Adafruit+graphics, and both Rust job filters include `tests/**`. All six workflow test commands ran locally and passed (25 all-feature debug/release, 21 core-only, 22 Framework, 23 Adafruit, 24 Adafruit+graphics). Formatting/whitespace checks pass. No GitHub Actions or new hardware run is claimed for this CI-only change.
+
+## Remaining decisions after autonomous follow-up
+
+The checked entries above now include measured static-table optimization, actual
+interrupt signaling, camera-evidence rejection, compatibility-preserving legacy
+constant explanation, existing setup-contract documentation, and invalid-page
+validation. Hardware is restored to normal updated ledtest; camera controls are
+restored. Remaining unchecked items are intentional:
+
+- Recoverable slice-error versus fixed-array contract for `fill_matrix()`.
+- Per-channel scaling interface and production detection/result lifecycle.
+- Uniform-fill semantics for custom/unmapped channels, buffering/dirty tracking,
+  and page-cache ownership/invalidation.
+- De-ghost efficacy remains unproven despite two usable exposure comparisons.
+- The short bitmap's physical meaning and a guaranteed detection-completion
+  condition remain unresolved. No physical short was introduced.

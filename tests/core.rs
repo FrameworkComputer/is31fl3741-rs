@@ -308,3 +308,19 @@ fn register_apis_stop_at_every_bus_failure() {
         }
     }
 }
+
+#[test]
+fn invalid_mapping_pages_are_rejected_without_bus_access() {
+    use std::sync::atomic::{AtomicU8, Ordering};
+    static PAGE: AtomicU8 = AtomicU8::new(2);
+    let mut d = driver();
+    d.calc_pixel = |_, _| (0, PAGE.load(Ordering::Relaxed));
+    for page in 2..=255 {
+        PAGE.store(page, Ordering::Relaxed);
+        assert!(
+            matches!(d.pixel(0, 0, 123), Err(Error::InvalidFrame(value)) if value == page),
+            "accepted invalid mapping page {page}"
+        );
+    }
+    assert_eq!(d.i2c.transactions, 0);
+}
