@@ -151,7 +151,11 @@ impl<I2C: I2c> IS31FL3741<I2C> {
         self.write_register(Page::Config, addresses::PWM_FREQ_REGISTER, pwm as u8)
     }
 
-    /// Set the global current
+    /// Set the global current multiplier for every LED
+    ///
+    /// Zero disables LED current; 255 selects the largest multiplier. Actual
+    /// current also depends on the external ISET resistor and per-LED scaling.
+    /// PWM and scaling registers are unchanged. [`Self::setup`] sets this to 255.
     pub fn set_global_current(&mut self, current: u8) -> Result<(), I2C::Error> {
         self.write_register(Page::Config, addresses::CURRENT_REGISTER, current)
     }
@@ -161,6 +165,10 @@ impl<I2C: I2c> IS31FL3741<I2C> {
     /// The resistors act during scan blanking to prevent LEDs that should be off
     /// from glowing due to parasitic capacitance. Use [`Resistor::Disabled`] to
     /// disable either pull independently.
+    ///
+    /// `pull_down` applies to SW1-SW9; `pull_up` applies to CS1-CS39.
+    /// The resistors operate during the non-overlap blanking interval (tNOL1).
+    /// Reset selects 8 kOhm for both. The useful setting depends on board wiring.
     pub fn set_deghost_resistors(
         &mut self,
         pull_down: Resistor,
@@ -174,6 +182,11 @@ impl<I2C: I2c> IS31FL3741<I2C> {
     /// `open` enables interrupts for open LEDs; `short` enables interrupts for
     /// shorted LEDs. If `auto_clear` is true, the interrupt automatically clears
     /// after INTB has been low for more than 8 ms.
+    ///
+    /// `open` and `short` enable their respective interrupts. `auto_clear` enables
+    /// automatic clearing when INTB has remained low for more than 8 ms.
+    /// Each call replaces all three settings; reset disables them all.
+    /// This does not trigger open/short detection or configure the MCU's INTB pin.
     pub fn set_interrupt_config(
         &mut self,
         open: bool,
@@ -190,6 +203,9 @@ impl<I2C: I2c> IS31FL3741<I2C> {
     ///
     /// These flags report whether an open or short fault occurred, without
     /// identifying the affected LEDs.
+    ///
+    /// Reserved bits are ignored. This returns status only; it does not trigger
+    /// detection or return the per-LED fault bitmap.
     pub fn read_interrupt_status(&mut self) -> Result<InterruptStatus, I2C::Error> {
         let v = self.read_u8(0xf1)?;
         Ok(InterruptStatus {
@@ -201,6 +217,7 @@ impl<I2C: I2c> IS31FL3741<I2C> {
     /// Select the high/low input logic thresholds
     ///
     /// Preserves the register's shutdown, scan, and open/short detection settings.
+    /// Reset selects [`LogicThreshold::High1V4Low0V4`].
     pub fn set_logic_threshold(&mut self, threshold: LogicThreshold) -> Result<(), I2C::Error> {
         let v = self.read_register(Page::Config, 0)?;
         self.write_register(Page::Config, 0, (v & !8) | threshold as u8)
@@ -321,10 +338,11 @@ pub enum SwSetting {
     NoScan = 0b1000,
 }
 
-/// Pull resistance used by [`IS31FL3741::set_deghost_resistors`].
+/// Pull resistance used during de-ghost blanking; shared by SW and CS settings.
 #[derive(Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum Resistor {
+    /// Disconnect the selected pull resistors.
     Disabled = 0,
     Ohms500 = 1,
     KiloOhms1 = 2,
