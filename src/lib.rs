@@ -80,10 +80,10 @@ impl<I2C: I2c> IS31FL3741<I2C> {
     /// the brightness should range from 0 to 255. If the coordinate is out of range then the
     /// function will return an error of [InvalidLocation](Error::InvalidLocation).
     pub fn pixel(&mut self, x: u8, y: u8, brightness: u8) -> Result<(), Error<I2C::Error>> {
-        if x > self.width {
+        if x >= self.width {
             return Err(Error::InvalidLocation(x));
         }
-        if y > self.height {
+        if y >= self.height {
             return Err(Error::InvalidLocation(y));
         }
         let (pixel, frame) = (self.calc_pixel)(x, y);

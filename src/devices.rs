@@ -33,10 +33,9 @@ impl<I2C: I2c> DrawTarget for AdafruitRGB13x9<I2C> {
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
         for Pixel(coord, color) in pixels.into_iter() {
-            // Check if the pixel coordinates are out of bounds (negative or greater than
-            // (63,63)). `DrawTarget` implementation are required to discard any out of bounds
+            // Check if the pixel coordinates are out of bounds (outside the 13 by 9 display). `DrawTarget` implementation are required to discard any out of bounds
             // pixels without returning an error or causing a panic.
-            if let (x @ 0..=13, y @ 0..=9) = coord.into() {
+            if let (x @ 0..=12, y @ 0..=8) = coord.into() {
                 // Calculate the index in the framebuffer.
                 self.pixel_rgb(x as u8, y as u8, color.r(), color.g(), color.b())?
             }
@@ -202,6 +201,12 @@ impl<I2C: I2c> AdafruitRGB13x9<I2C> {
         g: u8,
         b: u8,
     ) -> Result<(), Error<I2C::Error>> {
+        if x >= 13 {
+            return Err(Error::InvalidLocation(x));
+        }
+        if y >= 9 {
+            return Err(Error::InvalidLocation(y));
+        }
         let x = x + y * 13;
         self.device.pixel(x, 2, r)?;
         self.device.pixel(x, 1, g)?;
