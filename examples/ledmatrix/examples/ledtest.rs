@@ -2,6 +2,7 @@
 //!
 //! Goes into bootloader mode when the host is asleep. This is to make it easy to reflash your
 //! firmware - the regular bootloader mechanism using the DIP switch still works.
+//! The inputmodule USB serial bootloader command is also supported.
 #![no_std]
 #![no_main]
 #![allow(clippy::needless_range_loop)]
@@ -25,6 +26,8 @@ use rp2040_hal::{
 
 use is31fl3741::devices::{LedMatrix, CALC_PIXEL};
 use is31fl3741::PwmFreq;
+use usb_device::{class_prelude::UsbBusAllocator, prelude::*};
+use usbd_serial::{SerialPort, USB_CLASS_CDC};
 
 /// Maximum brightness out of 255
 ///
@@ -37,7 +40,7 @@ const XTAL_FREQ_HZ: u32 = 12_000_000;
 
 #[link_section = ".boot2"]
 #[used]
-pub static BOOT2: [u8; 256] = rp2040_boot2::BOOT_LOADER_GD25Q64CS;
+pub static BOOT2: [u8; 256] = rp2040_boot2::BOOT_LOADER_W25Q080;
 
 #[entry]
 fn main() -> ! {
@@ -59,6 +62,24 @@ fn main() -> ! {
 
     let timer = Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
     let mut delay = timer;
+
+    let usb_bus = UsbBusAllocator::new(hal::usb::UsbBus::new(
+        pac.USBCTRL_REGS,
+        pac.USBCTRL_DPRAM,
+        clocks.usb_clock,
+        true,
+        &mut pac.RESETS,
+    ));
+    let mut serial = SerialPort::new(&usb_bus);
+    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x32ac, 0x0020))
+        .strings(&[StringDescriptors::default()
+            .manufacturer("Framework Computer Inc")
+            .product("LED Matrix ledtest")])
+        .unwrap()
+        .device_class(USB_CLASS_CDC)
+        .build();
+    // Match the inputmodule bootloader command across USB packet boundaries.
+    let mut boot_command_prefix = 0;
 
     let pins = hal::gpio::Pins::new(
         pac.IO_BANK0,
@@ -127,7 +148,25 @@ fn main() -> ! {
         for y in 0..matrix.device.height {
             for x in 0..matrix.device.width {
                 matrix.device.pixel(x, y, 0xFF).expect("couldn't turn on");
-                delay.delay_ms(100);
+                for _ in 0..100 {
+                    usb_dev.poll(&mut [&mut serial]);
+                    let mut buf = [0; 64];
+                    if let Ok(count) = serial.read(&mut buf) {
+                        for &byte in &buf[..count] {
+                            boot_command_prefix = match (boot_command_prefix, byte) {
+                                (0, 0x32) => 1,
+                                (1, 0xAC) => 2,
+                                (2, 0x02) => {
+                                    reset_to_usb_boot(0, 0);
+                                    0
+                                }
+                                (_, 0x32) => 1,
+                                _ => 0,
+                            };
+                        }
+                    }
+                    delay.delay_ms(1);
+                }
                 matrix.device.pixel(x, y, 0).expect("couldn't turn off");
 
                 // Reset into bootloader if system asleep
