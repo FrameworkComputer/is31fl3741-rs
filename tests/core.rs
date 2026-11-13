@@ -171,3 +171,10 @@ fn deghost_resistors_regression() {
         .unwrap();
     assert_eq!(device.i2c.writes.last().unwrap(), &[2, 0x71]);
 }
+
+#[test]
+fn interrupt_config_regression() {
+    let mut device = driver();
+    device.set_interrupt_config(true, true, true).unwrap();
+    assert_eq!(device.i2c.writes, [vec![0xf0, 0x13]]);
+}
