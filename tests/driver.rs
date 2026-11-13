@@ -145,3 +145,33 @@ fn short_frame_panics_before_bus_access() {
         assert!(device.i2c.writes.is_empty());
     }
 }
+
+#[test]
+fn shutdown_preserves_all_other_configuration_bits() {
+    for config in 0..=255 {
+        for shutdown in [true, false] {
+            let mut device = driver();
+            device.i2c.read_value = config;
+            device.shutdown(shutdown).unwrap();
+            assert_eq!(
+                device.i2c.writes,
+                [
+                    vec![0xfe, 0xc5],
+                    vec![0xfd, 4],
+                    vec![0],
+                    vec![0xfe, 0xc5],
+                    vec![0xfd, 4],
+                    vec![0, (config & !1) | u8::from(!shutdown)],
+                ]
+            );
+        }
+    }
+}
+
+#[test]
+fn shutdown_stops_when_configuration_read_fails() {
+    let mut device = driver();
+    device.i2c.fail = true;
+    assert_eq!(device.shutdown(true), Err(ErrorKind::Other));
+    assert!(device.i2c.writes.is_empty());
+}
