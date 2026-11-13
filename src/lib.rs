@@ -147,6 +147,19 @@ impl<I2C: I2c> IS31FL3741<I2C> {
         self.write_register(Page::Config, addresses::CURRENT_REGISTER, current)
     }
 
+    /// Set the SWx pull-down and CSy pull-up resistors used to reduce LED ghosting.
+    ///
+    /// The resistors act during scan blanking to prevent LEDs that should be off
+    /// from glowing due to parasitic capacitance. Use [`Resistor::Disabled`] to
+    /// disable either pull independently.
+    pub fn set_deghost_resistors(
+        &mut self,
+        pull_down: Resistor,
+        pull_up: Resistor,
+    ) -> Result<(), I2C::Error> {
+        self.write_register(Page::Config, 2, (pull_down as u8) << 4 | pull_up as u8)
+    }
+
     fn write(&mut self, buf: &[u8]) -> Result<(), I2C::Error> {
         self.i2c.write(self.address, buf)
     }
@@ -260,4 +273,18 @@ pub enum SwSetting {
     Sw1Sw2 = 0b0111,
     // All CSx pins only act as current sink, no scanning
     NoScan = 0b1000,
+}
+
+/// Pull resistance used by [`IS31FL3741::set_deghost_resistors`].
+#[derive(Clone, Copy, Debug)]
+#[repr(u8)]
+pub enum Resistor {
+    Disabled = 0,
+    Ohms500 = 1,
+    KiloOhms1 = 2,
+    KiloOhms2 = 3,
+    KiloOhms4 = 4,
+    KiloOhms8 = 5,
+    KiloOhms16 = 6,
+    KiloOhms32 = 7,
 }
