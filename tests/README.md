@@ -30,3 +30,8 @@ Hardware regression firmware lives in
 See the [Framework instructions](../examples/ledmatrix/README.md) for running it.
 Hardware results are recorded separately from host test results; a passing host
 suite does not establish optical output or electrical behavior.
+
+`mapping.rs` exhaustively compares both device mappings with frozen channel
+fixtures captured before the static-table optimization. It also checks register
+ranges and channel uniqueness. These fixtures establish compatibility with the
+reviewed mappings, not independent verification of an Adafruit PCB schematic.

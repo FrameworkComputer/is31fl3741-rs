@@ -122,3 +122,13 @@ matrix state with Z. Subsequent T and five A reports passed. Original camera
 controls were read back as auto_exposure=3, exposure_time_absolute=156,
 exposure_dynamic_framerate=1, white_balance_automatic=1. See optical record for
 an earlier grouped camera restoration error and its successful correction.
+
+## Release mapping-table optimization
+
+Baseline driver `0d66ff2` and static-table variant used the same release diagnostic.
+`P` (30,600 mappings, no I²C) baseline microseconds: 471987, 471793, 471762,
+471842; static: 16509, 16435, 16429, 16446. Every checksum was 4876500.
+`T` and all five `A` reports passed on each variant. Read `../../measurements/README.md`
+for stack/code-size methodology and limits. Rebuilt/restored normal ledtest and
+verified application serial enumeration after testing. No new optical check was
+performed; mappings match frozen host fixtures exhaustively.

@@ -152,7 +152,7 @@ fn main() -> ! {
                         | b'4'
                         | b'5'
                         | b'6'
-                        | b'Z'
+                        | b'Z' | b'P'
                 ) {
                     let commands: &[u8] = if byte == b'A' {
                         b"GRLMI"
@@ -160,7 +160,23 @@ fn main() -> ! {
                         core::slice::from_ref(&byte)
                     };
                     for &command in commands {
-                        let result = if command.is_ascii_digit() {
+                        let mut timed_report = TextReport::new();
+                        let result = if command == b'P' {
+                            let start = delay.get_counter().ticks();
+                            let mut checksum = 0u32;
+                            for _ in 0..100 {
+                                for y in 0..34 {
+                                    for x in 0..9 {
+                                        let (register,page) = core::hint::black_box(CALC_PIXEL)(core::hint::black_box(x),core::hint::black_box(y));
+                                        checksum = checksum.wrapping_add(u32::from(register) + u32::from(page)*180);
+                                    }
+                                }
+                            }
+                            let elapsed=delay.get_counter().ticks()-start;
+                            use core::fmt::Write;
+                            let _=write!(&mut timed_report,"PASS: mapping30600; us={}; checksum={}\r\n",elapsed,checksum);
+                            Ok(())
+                        } else if command.is_ascii_digit() {
                             if optical_saved.is_none() {
                                 optical_saved = Snapshot::capture(&mut matrix.device).ok();
                             }
@@ -184,6 +200,7 @@ fn main() -> ! {
                             isolated_check(&mut matrix.device, command)
                         };
                         let report: &[u8] = match result {
+                            Ok(()) if command == b'P' => timed_report.as_bytes(),
                             Ok(()) => match command {
                                 b'0' => b"PASS: optical uniform GCC0; held\r\n",
                                 b'1' => b"PASS: optical uniform GCC16; held\r\n",
@@ -517,4 +534,16 @@ fn optical_pattern<I: embedded_hal::i2c::I2c>(
         }
     }
     Ok(())
+}
+
+struct TextReport { bytes: [u8;128], length: usize }
+impl TextReport {
+    fn new() -> Self { Self { bytes:[0;128],length:0 } }
+    fn as_bytes(&self) -> &[u8] { &self.bytes[..self.length] }
+}
+impl core::fmt::Write for TextReport {
+    fn write_str(&mut self,s:&str) -> core::fmt::Result {
+        if self.length+s.len()>self.bytes.len() {return Err(core::fmt::Error);}
+        self.bytes[self.length..self.length+s.len()].copy_from_slice(s.as_bytes());self.length+=s.len();Ok(())
+    }
 }

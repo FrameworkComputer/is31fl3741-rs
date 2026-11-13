@@ -129,3 +129,7 @@ Inspect evidence before accepting a result. Camera RGB values are not calibrated
 light measurements; clipping prevents claims about linearity. Similar ghosting
 images cannot establish absence of faint ghosting below this exposure's visibility.
 See `test-results/2026-11-13-optical` for this run's cropped evidence and limitations.
+
+`P` measures 30,600 Framework mapping calls without I²C, printing elapsed
+microseconds and a checksum. Use a release build for comparisons; see
+`../../measurements/README.md` for the before/after storage and timing study.
