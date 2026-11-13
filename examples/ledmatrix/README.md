@@ -79,3 +79,9 @@ elf2uf2-rs target/thumbv6m-none-eabi/debug/examples/ledtest ledtest.uf2
 ```
 
 Then copy `ledtest.uf2` to the RP2040 mass storage device while in bootloader mode.
+
+Diagnostic commands: `T` runs the full original check, `F` checks complete PWM
+frame readback, `C` checks coordinate rejection and corners without the frame
+check, and `S` runs the full sequence including shutdown/resume. `A` checks GCC,
+all resistor combinations, and logic-selection register readback, plus interrupt
+mask ACKs and a status read. `A` does not establish interrupt event behavior.

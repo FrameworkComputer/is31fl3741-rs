@@ -36,3 +36,48 @@ Send the bootloader command to the module serial port. Wait for RPI-RP2 to mount
 Restore normal operation by sending the bootloader command, building `ledtest`, converting it with `elf2uf2-rs`, and copying its UF2 to RPI-RP2.
 
 Host checks passed: 10 all-feature tests, 8 without defaults, strict all-feature Clippy, formatting, LED matrix example Clippy, embedded library build. Adafruit examples cross-built but emitted existing linker warnings about missing `_start`; that build alone does not establish runnable Adafruit firmware.
+
+## Corrective before/after hardware validation — 2026-11-13
+
+Earlier API commits had host-only validation. The results below were obtained
+subsequently; they do not retroactively establish hardware testing before those
+commits. Driver revisions were exported to isolated directories under
+`/tmp/is31-hil-before-after`. All used the same expanded diagnostic source and
+current example manifest/lockfile (for USB reporting), with each revision's
+unaltered driver source. Settings: 1 MHz I²C, scaling 50, 29 kHz PWM, SW1–SW8.
+Physical IC marking and board revision remain uninspected.
+
+| Check | Actual pre-fix revision | Observed baseline | Fixed revision `9e7cae9` |
+| --- | --- | --- | --- |
+| Full 351-channel PWM readback | `21c5c1a` | `FAIL: PWM351 readback` (one request) | `PASS: PWM351` (three requests) |
+| Coordinate rejection and corner register image | `7d71c1a` | `FAIL: invalid coordinate` (three requests) | `PASS: bounds` (three requests) |
+| Shutdown configuration preservation and resume | `3e73edd` | First request: `FAIL: config preservation`; subsequent two: `FAIL: initial config` because the failing test left the chip shut down | `PASS: PWM351 bounds shutdown resume` (three requests) |
+
+Commands `F`, `C`, and `S` select these checks. `C` skips the frame check so the
+older frame bug cannot hide the coordinate result. `S` currently runs the full
+frame/bounds/shutdown sequence. A camera still captured with the fixed bounds
+firmware displayed four bright corner LEDs. This is a qualitative corner-pattern
+observation, not a brightness, ghosting, or threshold measurement.
+
+### New API hardware checks
+
+Command `A` on driver `9e7cae9` returned, on three consecutive requests:
+
+```
+PASS: GCC resistor logic readback; IRQ ACK/status only
+```
+
+- GCC values 0, 1, 32, 128, and 255 matched PG4 `0x01` readback; previous GCC restored.
+- All 64 pull-down/pull-up combinations matched PG4 `0x02`; default 8kΩ/8kΩ restored.
+- Both logic selections matched configuration readback with unrelated bits preserved; communication continued; low-threshold selection restored.
+- All eight interrupt-mask combinations were accepted over I²C; mask restored to zero. Status read succeeded. No known fault event or INTB assertion was tested, so interrupt functionality remains unverified.
+
+These are fixed-revision checks only. Their parent revisions lack the APIs;
+the earlier missing-method compile failures demonstrate absence, not an on-device
+runtime failure. No synthetic no-op implementation was used as a baseline.
+Adafruit-specific behavior and short-input panics were not tested on this board.
+
+After these runs, rebuilt and restored `ledtest`; application serial enumerated
+at `/dev/ttyACM0`. Host all-feature tests passed (18 total), strict all-feature
+Clippy passed, and strict hardware_check Clippy passed. Expanded hardware
+diagnostic and restored ledtest both built.

@@ -132,9 +132,18 @@ fn main() -> ! {
         let mut buf = [0; 64];
         if let Ok(count) = serial.read(&mut buf) {
             for &byte in &buf[..count] {
-                if byte == b'T' {
-                    let report: &[u8] = match check(&mut matrix.device) {
-                        Ok(()) => b"PASS: PWM351 bounds shutdown resume\r\n",
+                if matches!(byte, b'T' | b'F' | b'C' | b'S' | b'A') {
+                    let report: &[u8] = match if byte == b'A' {
+                        check_apis(&mut matrix.device)
+                    } else {
+                        check(&mut matrix.device, byte)
+                    } {
+                        Ok(()) => match byte {
+                            b'A' => b"PASS: GCC resistor logic readback; IRQ ACK/status only\r\n",
+                            b'F' => b"PASS: PWM351\r\n",
+                            b'C' => b"PASS: bounds\r\n",
+                            _ => b"PASS: PWM351 bounds shutdown resume\r\n",
+                        },
                         Err(e) => e.as_bytes(),
                     };
                     let mut sent = 0;
@@ -177,19 +186,27 @@ fn read<I: embedded_hal::i2c::I2c>(
     }
     d.i2c.read(d.address, out).map_err(|_| "FAIL: read\r\n")
 }
-fn check<I: embedded_hal::i2c::I2c>(d: &mut is31fl3741::IS31FL3741<I>) -> Result<(), &'static str> {
+fn check<I: embedded_hal::i2c::I2c>(
+    d: &mut is31fl3741::IS31FL3741<I>,
+    mode: u8,
+) -> Result<(), &'static str> {
     let mut expected = [0; 351];
     let mut actual = [0; 351];
     for (i, v) in expected.iter_mut().enumerate() {
         *v = (i % 251) as u8;
     }
-    d.fill(0).map_err(|_| "FAIL: clear\r\n")?;
-    d.fill_matrix(&expected)
-        .map_err(|_| "FAIL: frame write\r\n")?;
-    read(d, 0, &mut actual[..180])?;
-    read(d, 1, &mut actual[180..])?;
-    if actual != expected {
-        return Err("FAIL: PWM351 readback\r\n");
+    if mode != b'C' {
+        d.fill(0).map_err(|_| "FAIL: clear\r\n")?;
+        d.fill_matrix(&expected)
+            .map_err(|_| "FAIL: frame write\r\n")?;
+        read(d, 0, &mut actual[..180])?;
+        read(d, 1, &mut actual[180..])?;
+        if actual != expected {
+            return Err("FAIL: PWM351 readback\r\n");
+        }
+    }
+    if mode == b'F' {
+        return Ok(());
     }
     d.fill(0).map_err(|_| "FAIL: clear\r\n")?;
     expected.fill(0);
@@ -210,6 +227,9 @@ fn check<I: embedded_hal::i2c::I2c>(d: &mut is31fl3741::IS31FL3741<I>) -> Result
     read(d, 1, &mut actual[180..])?;
     if actual != expected {
         return Err("FAIL: bounds readback\r\n");
+    }
+    if mode == b'C' {
+        return Ok(());
     }
     d.sw_enablement(is31fl3741::SwSetting::Sw1Sw8)
         .map_err(|_| "FAIL: rows\r\n")?;
@@ -232,5 +252,78 @@ fn check<I: embedded_hal::i2c::I2c>(d: &mut is31fl3741::IS31FL3741<I>) -> Result
     if actual != expected {
         return Err("FAIL: resume PWM\r\n");
     }
+    Ok(())
+}
+
+fn config_byte<I: embedded_hal::i2c::I2c>(
+    d: &mut is31fl3741::IS31FL3741<I>,
+    register: u8,
+) -> Result<u8, &'static str> {
+    for bytes in [&[0xfe, 0xc5][..], &[0xfd, 4], &[register]] {
+        d.i2c
+            .write(d.address, bytes)
+            .map_err(|_| "FAIL: API select\r\n")?;
+    }
+    let mut value = [0];
+    d.i2c
+        .read(d.address, &mut value)
+        .map_err(|_| "FAIL: API read\r\n")?;
+    Ok(value[0])
+}
+fn check_apis<I: embedded_hal::i2c::I2c>(
+    d: &mut is31fl3741::IS31FL3741<I>,
+) -> Result<(), &'static str> {
+    use is31fl3741::{LogicThreshold, Resistor};
+    let gcc = config_byte(d, 1)?;
+    for v in [0, 1, 32, 128, 255] {
+        d.set_global_current(v).map_err(|_| "FAIL: GCC write\r\n")?;
+        if config_byte(d, 1)? != v {
+            return Err("FAIL: GCC readback\r\n");
+        }
+    }
+    d.set_global_current(gcc)
+        .map_err(|_| "FAIL: GCC restore\r\n")?;
+    let resistors = [
+        Resistor::Disabled,
+        Resistor::Ohms500,
+        Resistor::KiloOhms1,
+        Resistor::KiloOhms2,
+        Resistor::KiloOhms4,
+        Resistor::KiloOhms8,
+        Resistor::KiloOhms16,
+        Resistor::KiloOhms32,
+    ];
+    for down in resistors {
+        for up in resistors {
+            d.set_deghost_resistors(down, up)
+                .map_err(|_| "FAIL: resistor write\r\n")?;
+            if config_byte(d, 2)? != (down as u8) << 4 | up as u8 {
+                return Err("FAIL: resistor readback\r\n");
+            }
+        }
+    }
+    d.set_deghost_resistors(Resistor::KiloOhms8, Resistor::KiloOhms8)
+        .map_err(|_| "FAIL: resistor restore\r\n")?;
+    let config = config_byte(d, 0)?;
+    for threshold in [LogicThreshold::High2V4Low0V6, LogicThreshold::High1V4Low0V4] {
+        d.set_logic_threshold(threshold)
+            .map_err(|_| "FAIL: logic write\r\n")?;
+        if config_byte(d, 0)? != (config & !8) | threshold as u8 {
+            return Err("FAIL: logic readback\r\n");
+        }
+    }
+    for open in [false, true] {
+        for short in [false, true] {
+            for clear in [false, true] {
+                d.set_interrupt_config(open, short, clear)
+                    .map_err(|_| "FAIL: IRQ ACK\r\n")?;
+            }
+        }
+    }
+    d.set_interrupt_config(false, false, false)
+        .map_err(|_| "FAIL: IRQ restore\r\n")?;
+    let _status = d
+        .read_interrupt_status()
+        .map_err(|_| "FAIL: IRQ status read\r\n")?;
     Ok(())
 }
