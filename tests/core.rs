@@ -1,36 +1,8 @@
-use embedded_hal::i2c::{ErrorKind, ErrorType, I2c, Operation};
+mod support;
+
+use embedded_hal::i2c::ErrorKind;
 use is31fl3741::{Error, IS31FL3741};
-
-#[derive(Default)]
-struct MockI2c {
-    writes: Vec<Vec<u8>>,
-    read_value: u8,
-    fail: bool,
-}
-
-impl ErrorType for MockI2c {
-    type Error = ErrorKind;
-}
-
-impl I2c for MockI2c {
-    fn transaction(
-        &mut self,
-        address: u8,
-        operations: &mut [Operation<'_>],
-    ) -> Result<(), Self::Error> {
-        assert_eq!(address, 0x30);
-        if self.fail {
-            return Err(ErrorKind::Other);
-        }
-        for operation in operations {
-            match operation {
-                Operation::Write(bytes) => self.writes.push(bytes.to_vec()),
-                Operation::Read(bytes) => bytes.fill(self.read_value),
-            }
-        }
-        Ok(())
-    }
-}
+use support::MockI2c;
 
 fn driver() -> IS31FL3741<MockI2c> {
     IS31FL3741 {
@@ -93,34 +65,6 @@ fn pixel_rejects_dimension_boundaries_without_bus_access() {
     assert!(device.i2c.writes.is_empty());
 }
 
-#[cfg(feature = "adafruit_rgb_13x9")]
-#[test]
-fn rgb_rejects_invalid_coordinates_before_flattening() {
-    let mut device = is31fl3741::devices::AdafruitRGB13x9::configure(MockI2c::default());
-    for (x, y) in [(13, 0), (0, 9), (255, 255)] {
-        assert!(matches!(
-            device.pixel_rgb(x, y, 1, 2, 3),
-            Err(Error::InvalidLocation(_))
-        ));
-    }
-    assert!(device.device.i2c.writes.is_empty());
-    device.pixel_rgb(12, 8, 1, 2, 3).unwrap();
-}
-
-#[cfg(all(feature = "adafruit_rgb_13x9", feature = "embedded_graphics"))]
-#[test]
-fn graphics_discards_out_of_bounds_pixels() {
-    use embedded_graphics_core::{pixelcolor::Rgb888, prelude::*};
-    let mut device = is31fl3741::devices::AdafruitRGB13x9::configure(MockI2c::default());
-    device
-        .draw_iter(
-            [(-1, 0), (0, -1), (13, 0), (0, 9), (13, 9)]
-                .map(|(x, y)| Pixel(Point::new(x, y), Rgb888::new(1, 2, 3))),
-        )
-        .unwrap();
-    assert!(device.device.i2c.writes.is_empty());
-}
-
 #[test]
 fn fill_matrix_sends_every_channel_in_order() {
     let mut device = driver();
@@ -171,7 +115,40 @@ fn shutdown_preserves_all_other_configuration_bits() {
 #[test]
 fn shutdown_stops_when_configuration_read_fails() {
     let mut device = driver();
-    device.i2c.fail = true;
+    device.i2c.fail_at = Some(3); // Fail the read, after page selection and register address.
     assert_eq!(device.shutdown(true), Err(ErrorKind::Other));
-    assert!(device.i2c.writes.is_empty());
+    assert_eq!(
+        device.i2c.writes,
+        [vec![0xfe, 0xc5], vec![0xfd, 4], vec![0]]
+    );
+}
+
+#[test]
+fn frame_write_stops_at_each_failed_transaction() {
+    for failed in 0..6 {
+        let mut device = driver();
+        device.i2c.fail_at = Some(failed);
+        assert_eq!(device.fill_matrix(&[42; 351]), Err(ErrorKind::Other));
+        assert_eq!(device.i2c.transactions, failed + 1);
+        assert_eq!(device.i2c.writes.len(), failed);
+    }
+}
+
+#[test]
+fn extra_frame_values_are_ignored() {
+    let mut device = driver();
+    let mut values = [42; 352];
+    values[351] = 99;
+    device.fill_matrix(&values).unwrap();
+    assert_eq!(device.i2c.writes[5].len(), 172);
+    assert!(device.i2c.writes[5][1..].iter().all(|&v| v == 42));
+}
+
+#[test]
+fn address_change_targets_subsequent_transactions() {
+    let mut device = driver();
+    device.set_address(0x33);
+    device.i2c.expected_address = Some(0x33);
+    device.pixel(0, 0, 42).unwrap();
+    assert_eq!(device.i2c.transactions, 3);
 }

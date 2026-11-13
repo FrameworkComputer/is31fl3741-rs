@@ -59,6 +59,7 @@ jobs:
       - if: steps.changes.outputs.rust == 'true'
         run: |
           cargo test --all-features
+          cargo test --all-features --release
           cargo test --no-default-features
           cargo doc --all-features
           cargo clippy --all-features --all-targets -- --deny=warnings
