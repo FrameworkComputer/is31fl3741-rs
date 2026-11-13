@@ -65,7 +65,7 @@ impl<I2C: I2c> IS31FL3741<I2C> {
     /// When you run this function the following steps will occur:
     /// 1. The chip will be told that it's being "reset".
     /// 2. The chip will be put in shutdown mode
-    /// 3. The chip will be configured to use the maximum voltage
+    /// 3. The chip will be configured to use maximum global current control
     /// 4. The chip will be taken out of shutdown mode
     pub fn setup<DEL: DelayNs>(&mut self, delay: &mut DEL) -> Result<(), Error<I2C::Error>> {
         self.reset(delay)?;
