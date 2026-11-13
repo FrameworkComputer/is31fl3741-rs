@@ -103,35 +103,35 @@ No behavioral decision is needed for these wording fixes.
 The register behavior is defined. Choose names consistent with the driver, preserve unrelated fields, and avoid changing setup defaults. These are optional features rather than prerequisites for the bug fixes.
 
 - [ ] **Expose global current control.**
-  **Status:** Implemented in `534400e`; partially verified. Missing-method compile baseline only, not an on-device failure baseline. Host case passes. Fixed-only hardware readback passed for GCC 0, 1, 32, 128, and 255 on three runs (`9dfce47`). Optical brightness sweep and broader host/error coverage remain pending.
+  **Status:** Implemented in `534400e`; partially verified. Missing-method compile baseline only, not an on-device failure baseline. Host case passes. Fixed-only hardware readback passed for GCC 0, 1, 32, 128, and 255 on three runs (`9dfce47`). Exhaustive GCC and bus-failure host coverage now passes; optical brightness sweep remains pending.
 
   PG4 `0x01` is currently hardcoded to `0xFF` during setup. Add a public setter. See Table 12, p. 14.
 
   **Automated:** Check exact PG4 `0x01` writes for 0, 1, 128, and 255, with no changes to PWM/scaling. **Hardware:** Hold PWM and scaling fixed, sweep GCC from 0 through several modest levels, and confirm blank at zero and increasing brightness. Read GCC back. A photodiode or fixed-exposure camera can quantify brightness; USB power includes controller overhead and is not a direct LED-current measurement.
 
 - [ ] **Expose de-ghost resistor selection.**
-  **Status:** Implemented in `78fb89a`; partially verified. Missing-method compile baseline only. One host encoding case passes; all 64 combinations passed hardware register readback on three runs (`9dfce47`). Optical ghosting comparison and broader host/error coverage remain pending.
+  **Status:** Implemented in `78fb89a`; partially verified. Missing-method compile baseline only. One host encoding case passes; all 64 combinations passed hardware register readback on three runs (`9dfce47`). All 64 encodings and bus-failure host coverage now pass; optical ghosting comparison remains pending.
 
   Add configuration for CS pull-up and SW pull-down resistors through PG4 `0x02`. `PULL_UP_REGISTER` exists but has no associated API. Follow Rev. D's corrected PUR/PDR definitions. See Table 13, p. 15.
 
   **Automated:** Exercise all eight PUR and PDR encodings independently. Assert PDR occupies bits 6:4, PUR bits 2:0, and reserved bits stay zero. **Hardware:** Read PG4 `0x02` back after selecting asymmetric settings to catch swapped fields. Compare sparse bright patterns on a dark background across resistor settings using fixed exposure. No visible ghosting is not proof that selection is broken; register readback verifies configuration, while the optical test evaluates this board’s behavior.
 
 - [ ] **Expose interrupt configuration.**
-  **Status:** Implemented in `bed1985`; partially verified. Missing-method compile baseline only. One host mask case passes; all eight combinations received hardware ACKs (`9dfce47`). Actual event masking, INTB behavior, and auto-clear timing remain unverified. Diagnostic firmware configures GPIO28 as INTB input but does not test it.
+  **Status:** Implemented in `bed1985`; partially verified. Missing-method compile baseline only. All eight host mask encodings and bus-failure checks pass; all eight combinations received hardware ACKs (`9dfce47`). Actual event masking, INTB behavior, and auto-clear timing remain unverified. Diagnostic firmware configures GPIO28 as INTB input but does not test it.
 
   Implement `0xF0` open/short interrupt enables and the auto-clear option. See Table 5, p. 10.
 
   **Automated:** Verify all combinations of IO, IS, and IAC encode into bits 0, 1, and 4 of global register `0xF0`; no reserved bits are set. It is write-only, so do not depend on readback. **Hardware:** First check the schematic for INTB routing and probe access. If accessible, use a logic analyzer/scope and a reproducible detection event to compare enabled/disabled masks and the documented auto-clear behavior after more than 8 ms. Without INTB access, mark electrical interrupt behavior unverified.
 
 - [ ] **Expose interrupt status.**
-  **Status:** Implemented in `ba5b4b7`; partially verified. Missing-method compile baseline only. One host decoding case passes and hardware status access succeeded (`9dfce47`). Complete synthetic status/error coverage and correlation with known detection events remain pending.
+  **Status:** Implemented in `ba5b4b7`; partially verified. Missing-method compile baseline only. All 256 host status bytes (including reserved bits) and bus-failure checks pass; hardware status access succeeded (`9dfce47`). Correlation with known detection events remains pending.
 
   Read open/short status from `0xF1`. See Table 6, p. 10.
 
   **Automated:** Supply `0x00`, `0x01`, `0x02`, and `0x03` from global register `0xF1` and check decoding of no fault, open, short, and both. Mask reserved bits and propagate bus errors. **Hardware:** Compare status with separate open/short detection reports and, if accessible, INTB. Record status before and after repeated reads to characterize any clearing behavior rather than assuming it.
 
 - [ ] **Expose logic-threshold selection.**
-  **Status:** Implemented in `9e7cae9`; partially verified. Missing-method compile baseline only. One host preservation case passes; both selections passed hardware configuration readback with continued communication on three runs (`9dfce47`). Broader host preservation/error coverage remains pending. Actual electrical thresholds were not measured.
+  **Status:** Implemented in `9e7cae9`; partially verified. Missing-method compile baseline only. One host preservation case passes; both selections passed hardware configuration readback with continued communication on three runs (`9dfce47`). All 256 configuration bytes under both selections and every transaction failure now have passing host coverage. Actual electrical thresholds were not measured.
 
   Configuration bit 3 selects 1.4V/0.4V or 2.4V/0.6V thresholds. Preserve the other configuration bits. See Table 11, p. 14.
 
@@ -249,3 +249,9 @@ Transaction counts are source-level estimates, not measured speedups. Resolve co
 4. Decide uniform-fill semantics, then measure the bulk-write improvement. Consider buffering next; dirty-range flushing depends on it.
 5. Define detection completion, state restoration, and result representation before implementing the diagnostic workflow. Validate INTB only if the board exposes it.
 6. Defer persistent page caching until ownership/invalidation is explicit, and mapping changes until release measurements justify them.
+
+## Regression coverage and diagnostic follow-up
+
+- [x] Strengthen register API host coverage. Baseline: existing 18 tests passed. After adding exhaustive parameter, preservation, and per-transaction failure checks: 23 all-feature tests pass in debug/release; 21 pass without default features; strict host Clippy passes. This is coverage expansion, not a demonstrated driver bug fix. No additional hardware test was run for this host-only change.
+- [ ] Report each diagnostic API independently and restore state after failures; verify deliberate failure followed by successful rerun on hardware.
+- [ ] Capture controlled camera brightness and ghosting comparisons, recording settings and limitations.

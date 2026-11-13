@@ -198,3 +198,113 @@ fn logic_threshold_regression() {
         .unwrap();
     assert_eq!(device.i2c.writes.last().unwrap(), &[0, 0x19]);
 }
+
+#[test]
+fn all_global_current_values_have_exact_transactions() {
+    for value in 0..=255 {
+        let mut d = driver();
+        d.set_global_current(value).unwrap();
+        assert_eq!(
+            d.i2c.writes,
+            [vec![0xfe, 0xc5], vec![0xfd, 4], vec![1, value]]
+        );
+    }
+}
+
+#[test]
+fn all_resistor_combinations_encode_only_documented_bits() {
+    use is31fl3741::Resistor::*;
+    let values = [
+        Disabled, Ohms500, KiloOhms1, KiloOhms2, KiloOhms4, KiloOhms8, KiloOhms16, KiloOhms32,
+    ];
+    for (down, &d) in values.iter().enumerate() {
+        for (up, &u) in values.iter().enumerate() {
+            let mut device = driver();
+            device.set_deghost_resistors(d, u).unwrap();
+            assert_eq!(
+                device.i2c.writes,
+                [
+                    vec![0xfe, 0xc5],
+                    vec![0xfd, 4],
+                    vec![2, (down as u8) << 4 | up as u8]
+                ]
+            );
+        }
+    }
+}
+
+#[test]
+fn all_interrupt_masks_and_status_bytes() {
+    for open in [false, true] {
+        for short in [false, true] {
+            for clear in [false, true] {
+                let mut d = driver();
+                d.set_interrupt_config(open, short, clear).unwrap();
+                assert_eq!(
+                    d.i2c.writes,
+                    [vec![
+                        0xf0,
+                        u8::from(open) | u8::from(short) << 1 | u8::from(clear) << 4
+                    ]]
+                );
+            }
+        }
+    }
+    for byte in 0..=255 {
+        let mut d = driver();
+        d.i2c.read_value = byte;
+        let status = d.read_interrupt_status().unwrap();
+        assert_eq!((status.open, status.short), (byte & 1 != 0, byte & 2 != 0));
+        assert_eq!(d.i2c.writes, [vec![0xf1]]);
+    }
+}
+
+#[test]
+fn logic_selection_preserves_every_other_bit() {
+    use is31fl3741::LogicThreshold::*;
+    for config in 0..=255 {
+        for (threshold, bit) in [(High1V4Low0V4, 0), (High2V4Low0V6, 8)] {
+            let mut d = driver();
+            d.i2c.read_value = config;
+            d.set_logic_threshold(threshold).unwrap();
+            assert_eq!(
+                d.i2c.writes,
+                [
+                    vec![0xfe, 0xc5],
+                    vec![0xfd, 4],
+                    vec![0],
+                    vec![0xfe, 0xc5],
+                    vec![0xfd, 4],
+                    vec![0, (config & !8) | bit]
+                ]
+            );
+        }
+    }
+}
+
+#[test]
+fn register_apis_stop_at_every_bus_failure() {
+    // Successful transaction counts include reads; each failing operation must be the last.
+    for (api, count) in [(0, 3), (1, 3), (2, 1), (3, 2), (4, 7)] {
+        for failed in 0..count {
+            let mut d = driver();
+            d.i2c.fail_at = Some(failed);
+            let result = match api {
+                0 => d.set_global_current(32),
+                1 => d.set_deghost_resistors(
+                    is31fl3741::Resistor::Disabled,
+                    is31fl3741::Resistor::KiloOhms32,
+                ),
+                2 => d.set_interrupt_config(true, false, true),
+                3 => d.read_interrupt_status().map(|_| ()),
+                _ => d.set_logic_threshold(is31fl3741::LogicThreshold::High2V4Low0V6),
+            };
+            assert_eq!(
+                result,
+                Err(ErrorKind::Other),
+                "API {api}, transaction {failed}"
+            );
+            assert_eq!(d.i2c.transactions, failed + 1);
+        }
+    }
+}
