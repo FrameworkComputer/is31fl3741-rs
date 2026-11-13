@@ -1,0 +1,23 @@
+{
+  "reports": [
+    [
+      "OBS: open enabled=0 auto=0 initial=0/0 scaling=255 pwm=255 low1=0 low12=0 low100=0 status=1/0 low_after_read=0 faults=6 bitmap=000000000000000000000000000040000000004000000000400000000040000000004000000000400000000000; state restored",
+      "OBS: open enabled=1 auto=0 initial=0/0 scaling=255 pwm=255 low1=1 low12=1 low100=1 status=1/0 low_after_read=0 faults=6 bitmap=000000000000000000000000000040000000004000000000400000000040000000004000000000400000000000; state restored",
+      "OBS: open enabled=1 auto=1 initial=0/0 scaling=255 pwm=255 low1=1 low12=0 low100=0 status=0/0 low_after_read=0 faults=6 bitmap=000000000000000000000000000040000000004000000000400000000040000000004000000000400000000000; state restored",
+      "OBS: short enabled=1 auto=0 initial=0/0 scaling=255 pwm=255 low1=1 low12=1 low100=1 status=2/0 low_after_read=0 faults=256 bitmap=ffffffff00ffffffff00ffffffff00ffffffff00ffffffff00ffffffff00ffffffff00ffffffff000000000000; state restored"
+    ],
+    [
+      "OBS: open enabled=0 auto=0 initial=0/0 scaling=255 pwm=255 low1=0 low12=0 low100=0 status=1/0 low_after_read=0 faults=6 bitmap=000000000000000000000000000040000000004000000000400000000040000000004000000000400000000000; state restored",
+      "OBS: open enabled=1 auto=0 initial=0/0 scaling=255 pwm=255 low1=1 low12=1 low100=1 status=1/0 low_after_read=0 faults=6 bitmap=000000000000000000000000000040000000004000000000400000000040000000004000000000400000000000; state restored",
+      "OBS: open enabled=1 auto=1 initial=0/0 scaling=255 pwm=255 low1=1 low12=0 low100=0 status=0/0 low_after_read=0 faults=6 bitmap=000000000000000000000000000040000000004000000000400000000040000000004000000000400000000000; state restored",
+      "OBS: short enabled=1 auto=0 initial=0/0 scaling=255 pwm=255 low1=1 low12=1 low100=1 status=2/0 low_after_read=0 faults=256 bitmap=ffffffff00ffffffff00ffffffff00ffffffff00ffffffff00ffffffff00ffffffff00ffffffff000000000000; state restored"
+    ],
+    [
+      "OBS: open enabled=0 auto=0 initial=0/0 scaling=255 pwm=255 low1=0 low12=0 low100=0 status=1/0 low_after_read=0 faults=6 bitmap=000000000000000000000000000040000000004000000000400000000040000000004000000000400000000000; state restored",
+      "OBS: open enabled=1 auto=0 initial=0/0 scaling=255 pwm=255 low1=1 low12=1 low100=1 status=1/0 low_after_read=0 faults=6 bitmap=000000000000000000000000000040000000004000000000400000000040000000004000000000400000000000; state restored",
+      "OBS: open enabled=1 auto=1 initial=0/0 scaling=255 pwm=255 low1=1 low12=0 low100=0 status=0/0 low_after_read=0 faults=6 bitmap=000000000000000000000000000040000000004000000000400000000040000000004000000000400000000000; state restored",
+      "OBS: short enabled=1 auto=0 initial=0/0 scaling=255 pwm=255 low1=1 low12=1 low100=1 status=2/0 low_after_read=0 faults=256 bitmap=ffffffff00ffffffff00ffffffff00ffffffff00ffffffff00ffffffff00ffffffff00ffffffff000000000000; state restored"
+    ]
+  ],
+  "short_bitmap_physical_meaning": "unvalidated"
+}

@@ -132,3 +132,19 @@ Baseline driver `0d66ff2` and static-table variant used the same release diagnos
 for stack/code-size methodology and limits. Rebuilt/restored normal ledtest and
 verified application serial enumeration after testing. No new optical check was
 performed; mappings match frozen host fixtures exhaustively.
+
+## Actual detection/INTB events
+
+See `test-results/2026-11-13-interrupts` for raw three-run reports, lower-drive
+controls, and interpretation. Full PWM/scaling255 at GCC1 produces exactly six
+expected active opens; lower-drive controls produced no flags. Open masking,
+latched INTB/read acknowledgement, and auto-clear between 1ms and 12ms were
+observed. Short-event signaling/status2 occurred, but the 256-channel bitmap is
+not interpreted as known physical shorts. Detection API/lifecycle remains deferred.
+Snapshots now restore/verify scaling as well as PWM/configuration. `E` repeated
+three times under the permanent regression script; all checks passed. `X`, `T`,
+and five `A` checks returned expected results afterward. Strict release diagnostic
+Clippy/build, 25 all-feature host tests, strict host Clippy, docs, and whitespace
+checks passed. Register state was restored after each case; diagnostic remains
+loaded for further optical investigation rather than claiming a firmware restore
+at this intermediate step.

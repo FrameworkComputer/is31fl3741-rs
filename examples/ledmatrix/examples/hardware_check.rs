@@ -90,7 +90,7 @@ fn main() -> ! {
     let mut led_enable = pins.gpio29.into_push_pull_output();
     led_enable.set_high().unwrap();
     // INTB. Currently ignoring
-    let _intb = pins.gpio28.into_floating_input();
+    let mut intb = pins.gpio28.into_pull_up_input();
 
     // I2C1 pins for the LED matrix
     let sda: hal::gpio::Pin<_, FunctionI2C, PullUp> = pins.gpio26.reconfigure();
@@ -152,55 +152,89 @@ fn main() -> ! {
                         | b'4'
                         | b'5'
                         | b'6'
-                        | b'Z' | b'P'
+                        | b'Z'
+                        | b'P'
+                        | b'E'
+                        | b'Q'
                 ) {
                     let commands: &[u8] = if byte == b'A' {
                         b"GRLMI"
+                    } else if byte == b'E' {
+                        b"efgh"
+                    } else if byte == b'Q' {
+                        b"jkl"
                     } else {
                         core::slice::from_ref(&byte)
                     };
                     for &command in commands {
                         let mut timed_report = TextReport::new();
-                        let result = if command == b'P' {
-                            let start = delay.get_counter().ticks();
-                            let mut checksum = 0u32;
-                            for _ in 0..100 {
-                                for y in 0..34 {
-                                    for x in 0..9 {
-                                        let (register,page) = core::hint::black_box(CALC_PIXEL)(core::hint::black_box(x),core::hint::black_box(y));
-                                        checksum = checksum.wrapping_add(u32::from(register) + u32::from(page)*180);
+                        let result =
+                            if matches!(command, b'e' | b'f' | b'g' | b'h' | b'j' | b'k' | b'l') {
+                                observe_interrupt(
+                                    &mut matrix.device,
+                                    command,
+                                    &mut delay,
+                                    &mut intb,
+                                    &mut timed_report,
+                                )
+                            } else if command == b'P' {
+                                let start = delay.get_counter().ticks();
+                                let mut checksum = 0u32;
+                                for _ in 0..100 {
+                                    for y in 0..34 {
+                                        for x in 0..9 {
+                                            let (register, page) =
+                                                core::hint::black_box(CALC_PIXEL)(
+                                                    core::hint::black_box(x),
+                                                    core::hint::black_box(y),
+                                                );
+                                            checksum = checksum.wrapping_add(
+                                                u32::from(register) + u32::from(page) * 180,
+                                            );
+                                        }
                                     }
                                 }
-                            }
-                            let elapsed=delay.get_counter().ticks()-start;
-                            use core::fmt::Write;
-                            let _=write!(&mut timed_report,"PASS: mapping30600; us={}; checksum={}\r\n",elapsed,checksum);
-                            Ok(())
-                        } else if command.is_ascii_digit() {
-                            if optical_saved.is_none() {
-                                optical_saved = Snapshot::capture(&mut matrix.device).ok();
-                            }
-                            if optical_saved.is_none() {
-                                Err("FAIL: optical snapshot\r\n")
+                                let elapsed = delay.get_counter().ticks() - start;
+                                use core::fmt::Write;
+                                let _ = write!(
+                                    &mut timed_report,
+                                    "PASS: mapping30600; us={}; checksum={}\r\n",
+                                    elapsed, checksum
+                                );
+                                Ok(())
+                            } else if command.is_ascii_digit() {
+                                if optical_saved.is_none() {
+                                    optical_saved = Snapshot::capture(&mut matrix.device).ok();
+                                }
+                                if optical_saved.is_none() {
+                                    Err("FAIL: optical snapshot\r\n")
+                                } else {
+                                    optical_pattern(&mut matrix.device, command)
+                                }
+                            } else if command == b'Z' {
+                                match optical_saved.as_ref() {
+                                    Some(saved) => {
+                                        let result = saved.restore(&mut matrix.device);
+                                        if result.is_ok() {
+                                            optical_saved = None;
+                                        }
+                                        result
+                                    }
+                                    None => Ok(()),
+                                }
                             } else {
-                                optical_pattern(&mut matrix.device, command)
-                            }
-                        } else if command == b'Z' {
-                            match optical_saved.as_ref() {
-                                Some(saved) => {
-                                    let result = saved.restore(&mut matrix.device);
-                                    if result.is_ok() {
-                                        optical_saved = None;
-                                    }
-                                    result
-                                }
-                                None => Ok(()),
-                            }
-                        } else {
-                            isolated_check(&mut matrix.device, command)
-                        };
+                                isolated_check(&mut matrix.device, command)
+                            };
                         let report: &[u8] = match result {
-                            Ok(()) if command == b'P' => timed_report.as_bytes(),
+                            Ok(())
+                                if command == b'P'
+                                    || matches!(
+                                        command,
+                                        b'e' | b'f' | b'g' | b'h' | b'j' | b'k' | b'l'
+                                    ) =>
+                            {
+                                timed_report.as_bytes()
+                            }
                             Ok(()) => match command {
                                 b'0' => b"PASS: optical uniform GCC0; held\r\n",
                                 b'1' => b"PASS: optical uniform GCC16; held\r\n",
@@ -418,6 +452,7 @@ fn check_apis<I: embedded_hal::i2c::I2c>(
 // Snapshot only registers touched by these diagnostics. Scaling remains unchanged.
 struct Snapshot {
     pwm: [u8; 351],
+    scaling: [u8; 351],
     config: u8,
     gcc: u8,
     resistors: u8,
@@ -442,8 +477,12 @@ impl Snapshot {
         let mut pwm = [0; 351];
         read(d, 0, &mut pwm[..180])?;
         read(d, 1, &mut pwm[180..])?;
+        let mut scaling = [0; 351];
+        read(d, 2, &mut scaling[..180])?;
+        read(d, 3, &mut scaling[180..])?;
         Ok(Self {
             pwm,
+            scaling,
             config: config_byte(d, 0)?,
             gcc: config_byte(d, 1)?,
             resistors: config_byte(d, 2)?,
@@ -463,6 +502,7 @@ impl Snapshot {
             raw_write(d, 0, self.config),
             d.fill_matrix(&self.pwm)
                 .map_err(|_| "FAIL: restore PWM\r\n"),
+            restore_scaling(d, &self.scaling),
             raw_write(d, 1, self.gcc),
             d.set_interrupt_config(false, false, false)
                 .map_err(|_| "FAIL: restore mask\r\n"),
@@ -470,8 +510,10 @@ impl Snapshot {
         if results.iter().any(Result::is_err) {
             return Err("FAIL: cleanup bus error; state uncertain\r\n");
         }
-        let actual = Self::capture(d)?;
+        let actual = Self::capture(d)
+            .map_err(|_| "FAIL: cleanup verification bus error; state uncertain\r\n")?;
         if actual.pwm != self.pwm
+            || actual.scaling != self.scaling
             || actual.config != self.config
             || actual.gcc != self.gcc
             || actual.resistors != self.resistors
@@ -536,14 +578,121 @@ fn optical_pattern<I: embedded_hal::i2c::I2c>(
     Ok(())
 }
 
-struct TextReport { bytes: [u8;128], length: usize }
+struct TextReport {
+    bytes: [u8; 384],
+    length: usize,
+}
 impl TextReport {
-    fn new() -> Self { Self { bytes:[0;128],length:0 } }
-    fn as_bytes(&self) -> &[u8] { &self.bytes[..self.length] }
+    fn new() -> Self {
+        Self {
+            bytes: [0; 384],
+            length: 0,
+        }
+    }
+    fn as_bytes(&self) -> &[u8] {
+        &self.bytes[..self.length]
+    }
 }
 impl core::fmt::Write for TextReport {
-    fn write_str(&mut self,s:&str) -> core::fmt::Result {
-        if self.length+s.len()>self.bytes.len() {return Err(core::fmt::Error);}
-        self.bytes[self.length..self.length+s.len()].copy_from_slice(s.as_bytes());self.length+=s.len();Ok(())
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        if self.length + s.len() > self.bytes.len() {
+            return Err(core::fmt::Error);
+        }
+        self.bytes[self.length..self.length + s.len()].copy_from_slice(s.as_bytes());
+        self.length += s.len();
+        Ok(())
     }
+}
+
+// Observations only: does not assume detection completion timing or a known short.
+fn observe_interrupt<I: embedded_hal::i2c::I2c, D: DelayNs, P: InputPin>(
+    d: &mut is31fl3741::IS31FL3741<I>,
+    mode: u8,
+    delay: &mut D,
+    pin: &mut P,
+    report: &mut TextReport,
+) -> Result<(), &'static str> {
+    use core::fmt::Write;
+    let saved = Snapshot::capture(d)?;
+    let result = (|| {
+        let short = mode == b'h';
+        let enabled = mode != b'e';
+        let auto = mode == b'g';
+        d.set_interrupt_config(false, false, false)
+            .map_err(|_| "FAIL: IRQ baseline mask\r\n")?;
+        let initial = d
+            .read_interrupt_status()
+            .map_err(|_| "FAIL: IRQ initial status\r\n")?;
+        let initial_low = pin.is_low().map_err(|_| "FAIL: INTB input\r\n")?;
+        let scaling = if matches!(mode, b'j' | b'l') { 50 } else { 255 };
+        let pwm = if matches!(mode, b'k' | b'l') {
+            128
+        } else {
+            255
+        };
+        d.set_scaling(scaling)
+            .map_err(|_| "FAIL: detect scaling\r\n")?;
+        d.fill(pwm).map_err(|_| "FAIL: detect PWM\r\n")?;
+        d.set_global_current(1)
+            .map_err(|_| "FAIL: detect GCC\r\n")?;
+        let config = config_byte(d, 0)? & !6;
+        raw_write(d, 0, config)?;
+        d.set_interrupt_config(enabled && !short, enabled && short, auto)
+            .map_err(|_| "FAIL: detect mask\r\n")?;
+        raw_write(d, 0, config | if short { 4 } else { 2 })?;
+        delay.delay_ms(1);
+        let low1 = pin.is_low().map_err(|_| "FAIL: INTB input\r\n")?;
+        delay.delay_ms(11);
+        let low12 = pin.is_low().map_err(|_| "FAIL: INTB input\r\n")?;
+        let mut bitmap = [0; 45];
+        for bytes in [&[0xfe, 0xc5][..], &[0xfd, 4], &[3]] {
+            d.i2c
+                .write(d.address, bytes)
+                .map_err(|_| "FAIL: bitmap select\r\n")?;
+        }
+        d.i2c
+            .read(d.address, &mut bitmap)
+            .map_err(|_| "FAIL: bitmap read\r\n")?;
+        delay.delay_ms(88);
+        let low100 = pin.is_low().map_err(|_| "FAIL: INTB input\r\n")?;
+        let status = d
+            .read_interrupt_status()
+            .map_err(|_| "FAIL: detect status\r\n")?;
+        let low_read = pin.is_low().map_err(|_| "FAIL: INTB input\r\n")?;
+        let status2 = d
+            .read_interrupt_status()
+            .map_err(|_| "FAIL: detect second status\r\n")?;
+        let count: u32 = bitmap
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (v & if i % 5 == 4 { 0x7f } else { 0xff }).count_ones())
+            .sum();
+        let bits = |v: is31fl3741::InterruptStatus| u8::from(v.open) | u8::from(v.short) << 1;
+        write!(report,"OBS: {} enabled={} auto={} initial={}/{} scaling={} pwm={} low1={} low12={} low100={} status={}/{} low_after_read={} faults={} bitmap=",if short {"short"} else {"open"},u8::from(enabled),u8::from(auto),bits(initial),u8::from(initial_low),scaling,pwm,u8::from(low1),u8::from(low12),u8::from(low100),bits(status),bits(status2),u8::from(low_read),count).map_err(|_| "FAIL: report size\r\n")?;
+        for v in bitmap {
+            write!(report, "{:02x}", v).map_err(|_| "FAIL: report size\r\n")?;
+        }
+        report
+            .write_str("; state restored\r\n")
+            .map_err(|_| "FAIL: report size\r\n")?;
+        Ok(())
+    })();
+    saved.restore(d)?;
+    result
+}
+
+fn restore_scaling<I: embedded_hal::i2c::I2c>(
+    d: &mut is31fl3741::IS31FL3741<I>,
+    values: &[u8; 351],
+) -> Result<(), &'static str> {
+    let mut payload = [0; 181];
+    for (page, start, length) in [(2, 0, 180), (3, 180, 171)] {
+        payload[1..=length].copy_from_slice(&values[start..start + length]);
+        for bytes in [&[0xfe, 0xc5][..], &[0xfd, page], &payload[..=length]] {
+            d.i2c
+                .write(d.address, bytes)
+                .map_err(|_| "FAIL: restore scaling\r\n")?;
+        }
+    }
+    Ok(())
 }

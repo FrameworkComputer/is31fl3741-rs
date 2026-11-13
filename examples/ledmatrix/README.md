@@ -133,3 +133,26 @@ See `test-results/2026-11-13-optical` for this run's cropped evidence and limita
 `P` measures 30,600 Framework mapping calls without I²C, printing elapsed
 microseconds and a checksum. Use a release build for comparisons; see
 `../../measurements/README.md` for the before/after storage and timing study.
+
+## Detection and interrupt observations
+
+`E` emits four `OBS:` lines: open detection with interrupts masked, open latched,
+open auto-clear, and short latched. GPIO28 reads INTB with an internal pull-up.
+It uses GCC1, PWM255, scaling255 and observes the pin at 1/12/100ms; it saves and
+restores all touched configuration, PWM, and scaling. The interrupt mask returns
+to disabled. Read-only status/history is acknowledged or replaced, not restored.
+`Q` varies scaling/PWM through 50/255, 255/128, and 50/128 using the same procedure.
+These are observations, not a production detection-completion API.
+
+Run the retained interrupt regression on the loaded diagnostic:
+
+```sh
+python3 scripts/check_interrupts.py --port /dev/ttyACM0 \
+  --output /tmp/matrix-interrupt-new-run.json
+```
+
+It expects the Framework six-channel open map and observed INTB/status behavior.
+An empty bitmap will fail the check rather than silently passing. Short-event
+signaling is tested, but the short bitmap's physical meaning is unresolved;
+no artificial short is introduced. Exact evidence and limitations are retained
+in `test-results/2026-11-13-interrupts`.

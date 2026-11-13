@@ -204,6 +204,8 @@ impl<I2C: I2c> IS31FL3741<I2C> {
     /// These flags report whether an open or short fault occurred, without
     /// identifying the affected LEDs.
     ///
+    /// On the tested Framework matrix, reading acknowledges the interrupt: flags
+    /// clear and latched INTB is released, so subsequent reads can return zero.
     /// Reserved bits are ignored. This returns status only; it does not trigger
     /// detection or return the per-LED fault bitmap.
     pub fn read_interrupt_status(&mut self) -> Result<InterruptStatus, I2C::Error> {

@@ -116,15 +116,15 @@ The register behavior is defined. Choose names consistent with the driver, prese
 
   **Automated:** Exercise all eight PUR and PDR encodings independently. Assert PDR occupies bits 6:4, PUR bits 2:0, and reserved bits stay zero. **Hardware:** Read PG4 `0x02` back after selecting asymmetric settings to catch swapped fields. Compare sparse bright patterns on a dark background across resistor settings using fixed exposure. No visible ghosting is not proof that selection is broken; register readback verifies configuration, while the optical test evaluates this board’s behavior.
 
-- [ ] **Expose interrupt configuration.**
-  **Status:** Implemented in `bed1985`; partially verified. Missing-method compile baseline only. All eight host mask encodings and bus-failure checks pass; all eight combinations received hardware ACKs (`9dfce47`). Actual event masking, INTB behavior, and auto-clear timing remain unverified. Diagnostic firmware configures GPIO28 as INTB input but does not test it.
+- [x] **Expose interrupt configuration.**
+  **Status:** Implemented in `bed1985`; host encodings and observed event signaling now verified. Missing-method compile baseline only. All eight host mask encodings and bus-failure checks pass; all eight combinations received hardware ACKs (`9dfce47`). Further E hardware observations verify masked open events leave INTB high, enabled events latch low until status read, and auto-clear releases between 1ms and 12ms samples. Short-event signaling was also observed; physical short diagnosis remains unresolved. Permanent interrupt regression passes three runs; see interrupt evidence directory. Diagnostic now tests GPIO28 INTB with a pull-up.
 
   Implement `0xF0` open/short interrupt enables and the auto-clear option. See Table 5, p. 10.
 
   **Automated:** Verify all combinations of IO, IS, and IAC encode into bits 0, 1, and 4 of global register `0xF0`; no reserved bits are set. It is write-only, so do not depend on readback. **Hardware:** First check the schematic for INTB routing and probe access. If accessible, use a logic analyzer/scope and a reproducible detection event to compare enabled/disabled masks and the documented auto-clear behavior after more than 8 ms. Without INTB access, mark electrical interrupt behavior unverified.
 
-- [ ] **Expose interrupt status.**
-  **Status:** Implemented in `ba5b4b7`; partially verified. Missing-method compile baseline only. All 256 host status bytes (including reserved bits) and bus-failure checks pass; hardware status access succeeded (`9dfce47`). Correlation with known detection events remains pending.
+- [x] **Expose interrupt status.**
+  **Status:** Implemented in `ba5b4b7`; host decoding and observed event acknowledgement now verified. Missing-method compile baseline only. All 256 host status bytes (including reserved bits) and bus-failure checks pass; hardware status access succeeded (`9dfce47`). Further E hardware checks correlate open status with exactly six unmapped active channels; first status read returns 1, second returns 0 and INTB releases. Short status2 was observed, but its 256-channel bitmap is not accepted as physical short diagnosis. Permanent interrupt regression passes three runs.
 
   Read open/short status from `0xF1`. See Table 6, p. 10.
 
@@ -180,6 +180,7 @@ Settle these before expanding the API surface or changing existing caller behavi
 These need a defined lifecycle and hardware evidence, beyond correct register encodings.
 
 - [ ] **Implement open/short detection triggers.**
+  **Status:** Diagnostic-only E/Q workflow measured drive preconditions, interrupt transitions, and result behavior; no public detection API added. Full PWM/scaling produced six expected open flags; lower-drive controls produced none. Physical meaning of short bitmap and a guaranteed completion condition remain unresolved. Lifecycle/state-restoration design is still pending.
   **Decision:** Choose synchronous versus staged detection, establish completion timing, and define how GCC and configuration are restored after success or bus failure.
 
   Configure OSDE (configuration bits 2:1). Set GCC to `0x01` before detection, and transition OSDE through `00` when retriggering. Define how the API restores the previous current setting. See pp. 14–15.
@@ -259,3 +260,5 @@ Transaction counts are source-level estimates, not measured speedups. Resolve co
 - [x] Replace placeholder register API documentation with parameter meanings, reset defaults, register scope, and detection/INTB limitations. Baseline: five methods shared the generic “Configure or inspect” sentence; documentation built. After: reviewed against datasheet tables, documentation builds, all 23 host tests and strict Clippy pass. Documentation only; no new hardware test for this change.
 
 - [x] Preserve exhaustive mapping fixtures and a repeatable Cortex-M0+ measurement probe. Both fixture tests pass before/after the static-table change; 25 all-feature debug/release tests, 21 no-default tests, and strict host/diagnostic Clippy pass.
+
+- [x] Investigate INTB/status/event behavior using existing board wiring. Three permanent hardware regression runs pass open-map, masking, read-ack, auto-clear interval, and short-event signaling checks. Diagnostic snapshots now include scaling. Full reports and limits are retained under `examples/ledmatrix/test-results/2026-11-13-interrupts`.
