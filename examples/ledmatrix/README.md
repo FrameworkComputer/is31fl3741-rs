@@ -165,3 +165,8 @@ fails and cleanup still runs. This rejects a missing/off-target lit pattern;
 it does not verify perfect framing or calibrated brightness. Camera subprocesses
 have a 30-second timeout. The later longer-exposure run used crop
 `200 330 465 420`; always verify the framing for the current camera position.
+
+`U` verifies the existing setup/scaling contract: setup clears all PWM/scaling,
+sets GCC255/config1, and an explicit scaling50 call sets all 351 scaling bytes.
+It snapshots and restores the full original state even when the check fails.
+This documents existing startup behavior, not a new automatic scaling default.

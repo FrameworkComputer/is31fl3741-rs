@@ -67,6 +67,12 @@ impl<I2C: I2c> IS31FL3741<I2C> {
     /// 2. The chip will be put in shutdown mode
     /// 3. The chip will be configured to use maximum global current control
     /// 4. The chip will be taken out of shutdown mode
+    ///
+    /// Reset clears PWM and per-LED scaling to zero. This method leaves scaling
+    /// at zero, so PWM writes alone will not light LEDs. Call
+    /// [`Self::set_scaling`] after setup to select the desired current scaling,
+    /// then write pixel brightness values. Calling setup again clears the
+    /// previous PWM/scaling values and other configuration back to reset defaults.
     pub fn setup<DEL: DelayNs>(&mut self, delay: &mut DEL) -> Result<(), Error<I2C::Error>> {
         self.reset(delay)?;
         self.shutdown(true)?;

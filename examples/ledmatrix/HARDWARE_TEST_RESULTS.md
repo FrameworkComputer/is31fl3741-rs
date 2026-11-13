@@ -166,3 +166,13 @@ Restoration sequencing correction: the first final-flash attempt timed out waiti
 for automount. The RPI-RP2 volume was then explicitly mounted and restoration was
 retried successfully; application serial enumeration was observed only after that
 retry. The final restoration claim refers to that completed retry, not the timeout.
+
+## Setup/scaling contract documentation
+
+New U diagnostic on unchanged setup behavior passed three requests before the
+wording change: all 351 PWM/scaling bytes zero, GCC255/config1 after setup;
+all scaling bytes50 and PWM still zero after explicit set_scaling(50).
+After documenting that existing contract, U repeated three times successfully,
+then T and all five A reports passed. Full state was restored after each request.
+Documentation build and strict release diagnostic Clippy/build passed. No startup
+default was changed and no claim is made that a functional bug was fixed here.

@@ -154,7 +154,8 @@ Settle these before expanding the API surface or changing existing caller behavi
 
   **Automated:** If keeping a slice API, try lengths 0, 179, 180, 350, 351, and 352. Invalid lengths must return an error before any I²C operation; document and test whether extra bytes are rejected or ignored. If using an array API, compile a valid `[u8; 351]` example and verify wrong-sized arrays fail to compile. **Hardware:** For a runtime-validated API, preserve a known pattern across invalid calls and check returned errors; mock coverage is sufficient for the no-write guarantee.
 
-- [ ] **Resolve scaling initialization in `setup()`.**
+- [x] **Resolve scaling initialization in `setup()`.**
+  **Status:** Documented the existing behavior without changing startup defaults: setup leaves PWM/scaling zero and requires an explicit `set_scaling()` call. A future default change remains a separate design decision. New U diagnostic verifies all 351 PWM/scaling bytes are zero after setup, GCC255/config1, then all scaling bytes50 after an explicit setter. U passes three hardware requests before the wording change and repeated requests afterward, with the full original state restored. Documentation build passes.
   **Decision:** Should setup leave scaling at reset defaults or initialize it? Choose the documented postcondition and whether changing existing startup behavior is acceptable.
 
   Reset clears all scaling registers to zero, and setup leaves them there. PWM writes therefore produce no light until `set_scaling()` is called. Either initialize scaling during setup or clearly document the required call. Existing examples already call `set_scaling()`. See Tables 7 and 9, pp. 11 and 13.

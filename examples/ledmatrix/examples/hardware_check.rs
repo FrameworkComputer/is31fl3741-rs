@@ -156,6 +156,7 @@ fn main() -> ! {
                         | b'P'
                         | b'E'
                         | b'Q'
+                        | b'U'
                 ) {
                     let commands: &[u8] = if byte == b'A' {
                         b"GRLMI"
@@ -177,6 +178,8 @@ fn main() -> ! {
                                     &mut intb,
                                     &mut timed_report,
                                 )
+                            } else if command == b'U' {
+                                observe_setup(&mut matrix.device, &mut delay)
                             } else if command == b'P' {
                                 let start = delay.get_counter().ticks();
                                 let mut checksum = 0u32;
@@ -236,6 +239,7 @@ fn main() -> ! {
                                 timed_report.as_bytes()
                             }
                             Ok(()) => match command {
+                                b'U' => b"PASS: setup zero PWM/scaling; explicit scaling; state restored\r\n",
                                 b'0' => b"PASS: optical uniform GCC0; held\r\n",
                                 b'1' => b"PASS: optical uniform GCC16; held\r\n",
                                 b'2' => b"PASS: optical uniform GCC64; held\r\n",
@@ -695,4 +699,31 @@ fn restore_scaling<I: embedded_hal::i2c::I2c>(
         }
     }
     Ok(())
+}
+
+fn observe_setup<I: embedded_hal::i2c::I2c, D: DelayNs>(
+    d: &mut is31fl3741::IS31FL3741<I>,
+    delay: &mut D,
+) -> Result<(), &'static str> {
+    let saved = Snapshot::capture(d)?;
+    let result = (|| {
+        d.setup(delay).map_err(|_| "FAIL: setup call\r\n")?;
+        let initialized = Snapshot::capture(d)?;
+        if initialized.pwm != [0; 351]
+            || initialized.scaling != [0; 351]
+            || initialized.gcc != 255
+            || initialized.config != 1
+        {
+            return Err("FAIL: setup postcondition\r\n");
+        }
+        d.set_scaling(50)
+            .map_err(|_| "FAIL: explicit scaling\r\n")?;
+        let scaled = Snapshot::capture(d)?;
+        if scaled.scaling != [50; 351] || scaled.pwm != [0; 351] {
+            return Err("FAIL: explicit scaling postcondition\r\n");
+        }
+        Ok(())
+    })();
+    saved.restore(d)?;
+    result
 }
