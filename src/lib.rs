@@ -177,6 +177,18 @@ impl<I2C: I2c> IS31FL3741<I2C> {
         ])
     }
 
+    /// Read the LED open and short interrupt flags.
+    ///
+    /// These flags report whether an open or short fault occurred, without
+    /// identifying the affected LEDs.
+    pub fn read_interrupt_status(&mut self) -> Result<InterruptStatus, I2C::Error> {
+        let v = self.read_u8(0xf1)?;
+        Ok(InterruptStatus {
+            open: v & 1 != 0,
+            short: v & 2 != 0,
+        })
+    }
+
     fn write(&mut self, buf: &[u8]) -> Result<(), I2C::Error> {
         self.i2c.write(self.address, buf)
     }
@@ -304,4 +316,13 @@ pub enum Resistor {
     KiloOhms8 = 5,
     KiloOhms16 = 6,
     KiloOhms32 = 7,
+}
+
+/// LED fault flags read from the interrupt status register.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InterruptStatus {
+    /// An LED open fault occurred.
+    pub open: bool,
+    /// An LED short fault occurred.
+    pub short: bool,
 }
