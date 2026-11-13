@@ -100,7 +100,7 @@ impl<I2C: I2c> IS31FL3741<I2C> {
         Ok(())
     }
 
-    /// Change the slave address to a new 7-bit address. Should be configured before calling
+    /// Change the driver target to a new 7-bit address; this does not change the hardware ADDR pin selection. Configure before calling
     /// [setup](Self::setup) method.
     pub fn set_address(&mut self, address: u8) {
         self.address = address;
