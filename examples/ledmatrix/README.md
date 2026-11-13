@@ -85,3 +85,14 @@ frame readback, `C` checks coordinate rejection and corners without the frame
 check, and `S` runs the full sequence including shutdown/resume. `A` checks GCC,
 all resistor combinations, and logic-selection register readback, plus interrupt
 mask ACKs and a status read. `A` does not establish interrupt event behavior.
+
+The diagnostic now restores and verifies the saved PWM/configuration state after
+successful and failed tests. `A` emits five separate lines; use `G` (GCC), `R`
+(resistors), `L` (logic), `M` (interrupt mask ACK), or `I` (status access) alone.
+`X` deliberately changes state and fails; expect
+`FAIL: deliberate injection; state restored`, then rerun `A` or `T` to verify
+continued operation. A cleanup error explicitly reports uncertain state.
+The write-only interrupt mask is always returned to disabled. Other touched
+registers are restored from readback; scaling is unchanged. Tests no longer
+leave the corner pattern displayed. Older run descriptions above refer to
+older diagnostic firmware.

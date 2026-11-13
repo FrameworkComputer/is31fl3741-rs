@@ -132,30 +132,40 @@ fn main() -> ! {
         let mut buf = [0; 64];
         if let Ok(count) = serial.read(&mut buf) {
             for &byte in &buf[..count] {
-                if matches!(byte, b'T' | b'F' | b'C' | b'S' | b'A') {
-                    let report: &[u8] = match if byte == b'A' {
-                        check_apis(&mut matrix.device)
+                if matches!(
+                    byte,
+                    b'T' | b'F' | b'C' | b'S' | b'A' | b'G' | b'R' | b'L' | b'M' | b'I' | b'X'
+                ) {
+                    let commands: &[u8] = if byte == b'A' {
+                        b"GRLMI"
                     } else {
-                        check(&mut matrix.device, byte)
-                    } {
-                        Ok(()) => match byte {
-                            b'A' => b"PASS: GCC resistor logic readback; IRQ ACK/status only\r\n",
-                            b'F' => b"PASS: PWM351\r\n",
-                            b'C' => b"PASS: bounds\r\n",
-                            _ => b"PASS: PWM351 bounds shutdown resume\r\n",
-                        },
-                        Err(e) => e.as_bytes(),
+                        core::slice::from_ref(&byte)
                     };
-                    let mut sent = 0;
-                    for _ in 0..2000 {
-                        usb_dev.poll(&mut [&mut serial]);
-                        if let Ok(n) = serial.write(&report[sent..]) {
-                            sent += n;
+                    for &command in commands {
+                        let report: &[u8] = match isolated_check(&mut matrix.device, command) {
+                            Ok(()) => match command {
+                                b'G' => b"PASS: GCC; state restored\r\n",
+                                b'R' => b"PASS: resistors; state restored\r\n",
+                                b'L' => b"PASS: logic; state restored\r\n",
+                                b'M' => b"PASS: IRQ mask ACK only; state restored\r\n",
+                                b'I' => b"PASS: IRQ status access only; state restored\r\n",
+                                b'F' => b"PASS: PWM351; state restored\r\n",
+                                b'C' => b"PASS: bounds; state restored\r\n",
+                                _ => b"PASS: PWM351 bounds shutdown resume; state restored\r\n",
+                            },
+                            Err(e) => e.as_bytes(),
+                        };
+                        let mut sent = 0;
+                        for _ in 0..2000 {
+                            usb_dev.poll(&mut [&mut serial]);
+                            if let Ok(n) = serial.write(&report[sent..]) {
+                                sent += n;
+                            }
+                            if sent == report.len() {
+                                break;
+                            }
+                            delay.delay_ms(1);
                         }
-                        if sent == report.len() {
-                            break;
-                        }
-                        delay.delay_ms(1);
                     }
                 }
                 boot_command_prefix = match (boot_command_prefix, byte) {
@@ -272,58 +282,159 @@ fn config_byte<I: embedded_hal::i2c::I2c>(
 }
 fn check_apis<I: embedded_hal::i2c::I2c>(
     d: &mut is31fl3741::IS31FL3741<I>,
+    mode: u8,
 ) -> Result<(), &'static str> {
     use is31fl3741::{LogicThreshold, Resistor};
-    let gcc = config_byte(d, 1)?;
-    for v in [0, 1, 32, 128, 255] {
-        d.set_global_current(v).map_err(|_| "FAIL: GCC write\r\n")?;
-        if config_byte(d, 1)? != v {
-            return Err("FAIL: GCC readback\r\n");
+    if mode == b'G' {
+        let gcc = config_byte(d, 1)?;
+        for v in [0, 1, 32, 128, 255] {
+            d.set_global_current(v).map_err(|_| "FAIL: GCC write\r\n")?;
+            if config_byte(d, 1)? != v {
+                return Err("FAIL: GCC readback\r\n");
+            }
         }
+        d.set_global_current(gcc)
+            .map_err(|_| "FAIL: GCC restore\r\n")?;
     }
-    d.set_global_current(gcc)
-        .map_err(|_| "FAIL: GCC restore\r\n")?;
-    let resistors = [
-        Resistor::Disabled,
-        Resistor::Ohms500,
-        Resistor::KiloOhms1,
-        Resistor::KiloOhms2,
-        Resistor::KiloOhms4,
-        Resistor::KiloOhms8,
-        Resistor::KiloOhms16,
-        Resistor::KiloOhms32,
-    ];
-    for down in resistors {
-        for up in resistors {
-            d.set_deghost_resistors(down, up)
-                .map_err(|_| "FAIL: resistor write\r\n")?;
-            if config_byte(d, 2)? != (down as u8) << 4 | up as u8 {
-                return Err("FAIL: resistor readback\r\n");
+    if mode == b'R' {
+        let resistors = [
+            Resistor::Disabled,
+            Resistor::Ohms500,
+            Resistor::KiloOhms1,
+            Resistor::KiloOhms2,
+            Resistor::KiloOhms4,
+            Resistor::KiloOhms8,
+            Resistor::KiloOhms16,
+            Resistor::KiloOhms32,
+        ];
+        for down in resistors {
+            for up in resistors {
+                d.set_deghost_resistors(down, up)
+                    .map_err(|_| "FAIL: resistor write\r\n")?;
+                if config_byte(d, 2)? != (down as u8) << 4 | up as u8 {
+                    return Err("FAIL: resistor readback\r\n");
+                }
+            }
+        }
+        d.set_deghost_resistors(Resistor::KiloOhms8, Resistor::KiloOhms8)
+            .map_err(|_| "FAIL: resistor restore\r\n")?;
+    }
+    if mode == b'L' {
+        let config = config_byte(d, 0)?;
+        for threshold in [LogicThreshold::High2V4Low0V6, LogicThreshold::High1V4Low0V4] {
+            d.set_logic_threshold(threshold)
+                .map_err(|_| "FAIL: logic write\r\n")?;
+            if config_byte(d, 0)? != (config & !8) | threshold as u8 {
+                return Err("FAIL: logic readback\r\n");
             }
         }
     }
-    d.set_deghost_resistors(Resistor::KiloOhms8, Resistor::KiloOhms8)
-        .map_err(|_| "FAIL: resistor restore\r\n")?;
-    let config = config_byte(d, 0)?;
-    for threshold in [LogicThreshold::High2V4Low0V6, LogicThreshold::High1V4Low0V4] {
-        d.set_logic_threshold(threshold)
-            .map_err(|_| "FAIL: logic write\r\n")?;
-        if config_byte(d, 0)? != (config & !8) | threshold as u8 {
-            return Err("FAIL: logic readback\r\n");
-        }
-    }
-    for open in [false, true] {
-        for short in [false, true] {
-            for clear in [false, true] {
-                d.set_interrupt_config(open, short, clear)
-                    .map_err(|_| "FAIL: IRQ ACK\r\n")?;
+    if mode == b'M' {
+        for open in [false, true] {
+            for short in [false, true] {
+                for clear in [false, true] {
+                    d.set_interrupt_config(open, short, clear)
+                        .map_err(|_| "FAIL: IRQ ACK\r\n")?;
+                }
             }
         }
+        d.set_interrupt_config(false, false, false)
+            .map_err(|_| "FAIL: IRQ restore\r\n")?;
     }
-    d.set_interrupt_config(false, false, false)
-        .map_err(|_| "FAIL: IRQ restore\r\n")?;
-    let _status = d
-        .read_interrupt_status()
-        .map_err(|_| "FAIL: IRQ status read\r\n")?;
+    if mode == b'I' {
+        let _status = d
+            .read_interrupt_status()
+            .map_err(|_| "FAIL: IRQ status read\r\n")?;
+    }
     Ok(())
+}
+
+// Snapshot only registers touched by these diagnostics. Scaling remains unchanged.
+struct Snapshot {
+    pwm: [u8; 351],
+    config: u8,
+    gcc: u8,
+    resistors: u8,
+    frequency: u8,
+}
+fn raw_write<I: embedded_hal::i2c::I2c>(
+    d: &mut is31fl3741::IS31FL3741<I>,
+    register: u8,
+    value: u8,
+) -> Result<(), &'static str> {
+    for bytes in [&[0xfe, 0xc5][..], &[0xfd, 4], &[register, value]] {
+        d.i2c
+            .write(d.address, bytes)
+            .map_err(|_| "FAIL: restore write\r\n")?;
+    }
+    Ok(())
+}
+impl Snapshot {
+    fn capture<I: embedded_hal::i2c::I2c>(
+        d: &mut is31fl3741::IS31FL3741<I>,
+    ) -> Result<Self, &'static str> {
+        let mut pwm = [0; 351];
+        read(d, 0, &mut pwm[..180])?;
+        read(d, 1, &mut pwm[180..])?;
+        Ok(Self {
+            pwm,
+            config: config_byte(d, 0)?,
+            gcc: config_byte(d, 1)?,
+            resistors: config_byte(d, 2)?,
+            frequency: config_byte(d, 0x36)?,
+        })
+    }
+    fn restore<I: embedded_hal::i2c::I2c>(
+        &self,
+        d: &mut is31fl3741::IS31FL3741<I>,
+    ) -> Result<(), &'static str> {
+        // Attempt every cleanup operation even if an earlier one fails. Interrupt mask
+        // is write-only: this diagnostic owns it and always returns it to disabled.
+        let results = [
+            raw_write(d, 1, 0),
+            raw_write(d, 2, self.resistors),
+            raw_write(d, 0x36, self.frequency),
+            raw_write(d, 0, self.config),
+            d.fill_matrix(&self.pwm)
+                .map_err(|_| "FAIL: restore PWM\r\n"),
+            raw_write(d, 1, self.gcc),
+            d.set_interrupt_config(false, false, false)
+                .map_err(|_| "FAIL: restore mask\r\n"),
+        ];
+        if results.iter().any(Result::is_err) {
+            return Err("FAIL: cleanup bus error; state uncertain\r\n");
+        }
+        let actual = Self::capture(d)?;
+        if actual.pwm != self.pwm
+            || actual.config != self.config
+            || actual.gcc != self.gcc
+            || actual.resistors != self.resistors
+            || actual.frequency != self.frequency
+        {
+            return Err("FAIL: cleanup readback; state uncertain\r\n");
+        }
+        Ok(())
+    }
+}
+fn isolated_check<I: embedded_hal::i2c::I2c>(
+    d: &mut is31fl3741::IS31FL3741<I>,
+    mode: u8,
+) -> Result<(), &'static str> {
+    let saved = Snapshot::capture(d)?;
+    let result = if mode == b'X' {
+        (|| {
+            d.set_global_current(0)
+                .map_err(|_| "FAIL: injection write\r\n")?;
+            raw_write(d, 2, 0)?;
+            raw_write(d, 0, 0x10)?;
+            d.fill(42).map_err(|_| "FAIL: injection frame\r\n")?;
+            Err("FAIL: deliberate injection; state restored\r\n")
+        })()
+    } else if matches!(mode, b'G' | b'R' | b'L' | b'M' | b'I') {
+        check_apis(d, mode)
+    } else {
+        check(d, mode)
+    };
+    saved.restore(d)?;
+    result
 }

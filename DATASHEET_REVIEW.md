@@ -253,5 +253,5 @@ Transaction counts are source-level estimates, not measured speedups. Resolve co
 ## Regression coverage and diagnostic follow-up
 
 - [x] Strengthen register API host coverage. Baseline: existing 18 tests passed. After adding exhaustive parameter, preservation, and per-transaction failure checks: 23 all-feature tests pass in debug/release; 21 pass without default features; strict host Clippy passes. This is coverage expansion, not a demonstrated driver bug fix. No additional hardware test was run for this host-only change.
-- [ ] Report each diagnostic API independently and restore state after failures; verify deliberate failure followed by successful rerun on hardware.
+- [x] Report each diagnostic API independently and restore state after failures. Baseline: old `A` gave one combined line; historical shutdown failure contaminated subsequent requests. Revised hardware: three `X` deliberate failures restored state, then `A X A T A` returned distinct API lines and successful reruns with verified restoration. Strict diagnostic Clippy and build pass. Physical bus disconnection was not tested; cleanup errors explicitly report uncertain state. See hardware run record.
 - [ ] Capture controlled camera brightness and ghosting comparisons, recording settings and limitations.

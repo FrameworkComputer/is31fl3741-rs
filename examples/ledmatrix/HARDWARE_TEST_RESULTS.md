@@ -81,3 +81,28 @@ After these runs, rebuilt and restored `ledtest`; application serial enumerated
 at `/dev/ttyACM0`. Host all-feature tests passed (18 total), strict all-feature
 Clippy passed, and strict hardware_check Clippy passed. Expanded hardware
 diagnostic and restored ledtest both built.
+
+## Independent reporting and recovery
+
+Baseline diagnostic (`9dfce47` firmware artifact) returned one combined API PASS
+line on each of three `A` requests. Its earlier shutdown baseline left the chip
+shut down after failure, contaminating subsequent requests (see above).
+
+The revised diagnostic snapshots all PWM bytes, configuration, GCC, resistor
+selection, and PWM frequency before each check. It attempts all restore writes
+on failure and success, then compares a fresh snapshot. Scaling is untouched.
+The diagnostic owns the write-only interrupt mask and returns it to disabled;
+it does not claim to read or preserve an arbitrary prior mask. Cleanup bus errors
+are reported as state uncertain. Physical bus-disconnection recovery was not tested.
+
+Hardware results: three `X` requests each returned
+`FAIL: deliberate injection; state restored`. The injection changes GCC, resistor
+selection, software shutdown, and PWM data before failing. Then `A X A T A`
+returned five distinct API PASS lines per `A`, the expected deliberate failure
+for `X`, and a full frame/bounds/shutdown PASS for `T`. Every successful line
+reported state restored after matching readback. No firmware reset was required
+between commands. IRQ PASS lines explicitly cover mask ACK/status access only.
+
+Expanded firmware built and passed strict example Clippy. Host tests: 23
+all-feature debug/release, 21 no-default-feature, strict host Clippy passed in
+the preceding coverage step. No driver behavior was changed in this diagnostic step.
