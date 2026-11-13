@@ -20,7 +20,9 @@ To install this driver in your project add the following line to your `Cargo.tom
 is31fl3741 = "0.5.0"
 ```
 
-By default this version will only contain the core driver.
+By default this crate includes the core driver and `embedded_graphics` support.
+Preconfigured devices must be enabled separately. To disable graphics support, use
+`is31fl3741 = { version = "0.4.0", default-features = false }`.
 
 To use a preconfigured device ([Framework LED Matrix](https://frame.work/tw/en/products/16-led-matrix) or [Adafruit 13x9 RGB LED Matrix](https://www.adafruit.com/product/5201)),
 you would need to change this line to include that device:
@@ -33,7 +35,8 @@ is31fl3741 = { version = "0.5.0", features = ["adafruit_rgb_13x9"] }
 ## Graphics
 
 This driver contains optional support for the [embedded-graphics](https://docs.rs/embedded-graphics/latest/embedded_graphics/) library.
-Enable the `embedded_graphics` feature to use it.
+The `embedded_graphics` feature is enabled by default. If you disable default
+features, enable `embedded_graphics` explicitly to use it.
 
 The `adafruit_rgb/gaypride` example shows off a use of this.
 

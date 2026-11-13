@@ -2,7 +2,7 @@
 #[allow(unused_imports)]
 use crate::{Error, IS31FL3741};
 #[allow(unused_imports)]
-use core::convert::TryFrom;
+use core::convert::Into;
 #[allow(unused_imports)]
 use embedded_hal::delay::DelayNs;
 #[allow(unused_imports)]
@@ -36,7 +36,7 @@ impl<I2C: I2c> DrawTarget for AdafruitRGB13x9<I2C> {
             // Check if the pixel coordinates are out of bounds (negative or greater than
             // (63,63)). `DrawTarget` implementation are required to discard any out of bounds
             // pixels without returning an error or causing a panic.
-            if let Ok((x @ 0..=13, y @ 0..=9)) = coord.try_into() {
+            if let (x @ 0..=13, y @ 0..=9) = coord.into() {
                 // Calculate the index in the framebuffer.
                 self.pixel_rgb(x as u8, y as u8, color.r(), color.g(), color.b())?
             }
