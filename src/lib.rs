@@ -160,6 +160,23 @@ impl<I2C: I2c> IS31FL3741<I2C> {
         self.write_register(Page::Config, 2, (pull_down as u8) << 4 | pull_up as u8)
     }
 
+    /// Configure which LED faults assert the active-low INTB interrupt output.
+    ///
+    /// `open` enables interrupts for open LEDs; `short` enables interrupts for
+    /// shorted LEDs. If `auto_clear` is true, the interrupt automatically clears
+    /// after INTB has been low for more than 8 ms.
+    pub fn set_interrupt_config(
+        &mut self,
+        open: bool,
+        short: bool,
+        auto_clear: bool,
+    ) -> Result<(), I2C::Error> {
+        self.write(&[
+            0xf0,
+            u8::from(open) | u8::from(short) << 1 | u8::from(auto_clear) << 4,
+        ])
+    }
+
     fn write(&mut self, buf: &[u8]) -> Result<(), I2C::Error> {
         self.i2c.write(self.address, buf)
     }
