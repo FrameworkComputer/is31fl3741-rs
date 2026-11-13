@@ -106,3 +106,19 @@ between commands. IRQ PASS lines explicitly cover mask ACK/status access only.
 Expanded firmware built and passed strict example Clippy. Host tests: 23
 all-feature debug/release, 21 no-default-feature, strict host Clippy passed in
 the preceding coverage step. No driver behavior was changed in this diagnostic step.
+
+## Fixed-exposure optical comparisons
+
+Cropped camera evidence and measurements are retained in
+`test-results/2026-11-13-optical/README.md` and its adjacent PNG/JSON files.
+Uniform PWM128 at GCC0/16/64/255 showed dark/increasing output. Some bright LED
+cores clipped; no linearity claim is made. Sparse PWM255/GCC255 patterns with
+resistors disabled/8kΩ/32kΩ, then repeated 8kΩ/disabled, showed no conclusive
+resistor-dependent ghosting difference at fixed 5ms exposure. That does not prove
+absence of faint ghosting. Register readback is independently covered.
+
+The permanent camera capture script completed all ten settings and restored
+matrix state with Z. Subsequent T and five A reports passed. Original camera
+controls were read back as auto_exposure=3, exposure_time_absolute=156,
+exposure_dynamic_framerate=1, white_balance_automatic=1. See optical record for
+an earlier grouped camera restoration error and its successful correction.

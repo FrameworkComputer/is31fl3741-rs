@@ -5,8 +5,8 @@
 Keep repeatable on-device checks in `examples/hardware_check.rs`. The firmware
 accepts ASCII `T` over USB serial and reports PASS/FAIL. It checks all 351 PWM
 registers, coordinate bounds, shutdown configuration preservation, and PWM
-retention after resume. Successful tests leave a four-corner pattern. A failed
-test may leave an intermediate state. These are register checks; inspect optical
+retention after resume. Tests restore and verify the saved PWM/configuration state on success and failure.
+A cleanup bus error explicitly reports uncertain state. These are register checks; inspect optical
 output separately.
 
 From this directory, build and convert the diagnostic:
@@ -96,3 +96,36 @@ The write-only interrupt mask is always returned to disabled. Other touched
 registers are restored from readback; scaling is unchanged. Tests no longer
 leave the corner pattern displayed. Older run descriptions above refer to
 older diagnostic firmware.
+
+
+## Camera checks
+
+Build and flash `hardware_check` as above. Optical commands hold their pattern:
+`0`, `1`, `2`, `3` display uniform PWM 128 at GCC 0, 16, 64, 255; `4`, `5`, `6`
+display the same sparse pattern (x=4, y=1,5,...,33, PWM 255, GCC 255) with both
+resistors disabled, 8kΩ, and 32kΩ respectively. Scaling remains at diagnostic
+startup value 50. `Z` restores the state saved before the first optical command.
+Restore with `Z` before running normal tests; normal tests preserve the state
+present at their own start. Do not leave optical commands unattended on failure:
+send `Z` again or restore normal firmware if cleanup fails.
+
+On Linux, with `ffmpeg`, `v4l2-ctl`, and Python Pillow available:
+
+```sh
+python3 scripts/capture_optical.py --port /dev/ttyACM0 \
+  --camera /dev/video0 --output /tmp/matrix-optical-new-run \
+  --crop 175 185 490 280
+```
+
+Verify the selected serial device and camera first. The crop is specific to the
+recorded camera position; adjust it to include the matrix after moving the camera.
+The output directory must be new. The script records three frames per setting,
+keeps cropped first-frame evidence and a comparison sheet, and records RGB means
+and clipping counts. It uses manual 5ms exposure and 4600K white balance, then
+restores the matrix with `Z` and the camera controls in `finally`. Raw full-scene
+frames are temporary. It does not flash or restore application firmware.
+
+Inspect evidence before accepting a result. Camera RGB values are not calibrated
+light measurements; clipping prevents claims about linearity. Similar ghosting
+images cannot establish absence of faint ghosting below this exposure's visibility.
+See `test-results/2026-11-13-optical` for this run's cropped evidence and limitations.

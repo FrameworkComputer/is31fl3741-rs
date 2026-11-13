@@ -102,15 +102,15 @@ No behavioral decision is needed for these wording fixes.
 
 The register behavior is defined. Choose names consistent with the driver, preserve unrelated fields, and avoid changing setup defaults. These are optional features rather than prerequisites for the bug fixes.
 
-- [ ] **Expose global current control.**
-  **Status:** Implemented in `534400e`; partially verified. Missing-method compile baseline only, not an on-device failure baseline. Host case passes. Fixed-only hardware readback passed for GCC 0, 1, 32, 128, and 255 on three runs (`9dfce47`). Exhaustive GCC and bus-failure host coverage now passes; optical brightness sweep remains pending.
+- [x] **Expose global current control.**
+  **Status:** Implemented in `534400e`; partially verified. Missing-method compile baseline only, not an on-device failure baseline. Host case passes. Fixed-only hardware readback passed for GCC 0, 1, 32, 128, and 255 on three runs (`9dfce47`). Exhaustive GCC and bus-failure host coverage passes. Fixed-exposure camera sweep at GCC 0/16/64/255 shows dark/increasing brightness; some LED cores clip, so linearity was not measured. See optical evidence directory.
 
   PG4 `0x01` is currently hardcoded to `0xFF` during setup. Add a public setter. See Table 12, p. 14.
 
   **Automated:** Check exact PG4 `0x01` writes for 0, 1, 128, and 255, with no changes to PWM/scaling. **Hardware:** Hold PWM and scaling fixed, sweep GCC from 0 through several modest levels, and confirm blank at zero and increasing brightness. Read GCC back. A photodiode or fixed-exposure camera can quantify brightness; USB power includes controller overhead and is not a direct LED-current measurement.
 
 - [ ] **Expose de-ghost resistor selection.**
-  **Status:** Implemented in `78fb89a`; partially verified. Missing-method compile baseline only. One host encoding case passes; all 64 combinations passed hardware register readback on three runs (`9dfce47`). All 64 encodings and bus-failure host coverage now pass; optical ghosting comparison remains pending.
+  **Status:** Implemented in `78fb89a`; partially verified. Missing-method compile baseline only. One host encoding case passes; all 64 combinations passed hardware register readback on three runs (`9dfce47`). All 64 encodings and bus-failure host coverage pass. Camera comparison of disabled/8kΩ/32kΩ shows no conclusive ghosting difference at this exposure; efficacy remains unverified. Register configuration is verified.
 
   Add configuration for CS pull-up and SW pull-down resistors through PG4 `0x02`. `PULL_UP_REGISTER` exists but has no associated API. Follow Rev. D's corrected PUR/PDR definitions. See Table 13, p. 15.
 
@@ -130,7 +130,7 @@ The register behavior is defined. Choose names consistent with the driver, prese
 
   **Automated:** Supply `0x00`, `0x01`, `0x02`, and `0x03` from global register `0xF1` and check decoding of no fault, open, short, and both. Mask reserved bits and propagate bus errors. **Hardware:** Compare status with separate open/short detection reports and, if accessible, INTB. Record status before and after repeated reads to characterize any clearing behavior rather than assuming it.
 
-- [ ] **Expose logic-threshold selection.**
+- [x] **Expose logic-threshold selection.**
   **Status:** Implemented in `9e7cae9`; partially verified. Missing-method compile baseline only. One host preservation case passes; both selections passed hardware configuration readback with continued communication on three runs (`9dfce47`). All 256 configuration bytes under both selections and every transaction failure now have passing host coverage. Actual electrical thresholds were not measured.
 
   Configuration bit 3 selects 1.4V/0.4V or 2.4V/0.6V thresholds. Preserve the other configuration bits. See Table 11, p. 14.
@@ -254,4 +254,4 @@ Transaction counts are source-level estimates, not measured speedups. Resolve co
 
 - [x] Strengthen register API host coverage. Baseline: existing 18 tests passed. After adding exhaustive parameter, preservation, and per-transaction failure checks: 23 all-feature tests pass in debug/release; 21 pass without default features; strict host Clippy passes. This is coverage expansion, not a demonstrated driver bug fix. No additional hardware test was run for this host-only change.
 - [x] Report each diagnostic API independently and restore state after failures. Baseline: old `A` gave one combined line; historical shutdown failure contaminated subsequent requests. Revised hardware: three `X` deliberate failures restored state, then `A X A T A` returned distinct API lines and successful reruns with verified restoration. Strict diagnostic Clippy and build pass. Physical bus disconnection was not tested; cleanup errors explicitly report uncertain state. See hardware run record.
-- [ ] Capture controlled camera brightness and ghosting comparisons, recording settings and limitations.
+- [x] Capture controlled camera brightness and ghosting comparisons. Zero-current baseline and GCC16/64/255 sweep show increasing brightness; some LED cores clip. Repeated sparse disabled/8kΩ/32kΩ captures show no conclusive ghosting difference. Cropped evidence, three-frame RGB/clipping metrics, settings, and limitations are retained under `examples/ledmatrix/test-results/2026-11-13-optical`. Permanent capture script ran end to end and restored saved matrix state and original camera controls. This completes the comparison task, not proof of de-ghost efficacy.

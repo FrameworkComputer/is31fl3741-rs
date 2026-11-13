@@ -127,6 +127,7 @@ fn main() -> ! {
 
     matrix.device.set_pwm_freq(PwmFreq::P29k).unwrap();
 
+    let mut optical_saved: Option<Snapshot> = None;
     loop {
         usb_dev.poll(&mut [&mut serial]);
         let mut buf = [0; 64];
@@ -134,7 +135,24 @@ fn main() -> ! {
             for &byte in &buf[..count] {
                 if matches!(
                     byte,
-                    b'T' | b'F' | b'C' | b'S' | b'A' | b'G' | b'R' | b'L' | b'M' | b'I' | b'X'
+                    b'T' | b'F'
+                        | b'C'
+                        | b'S'
+                        | b'A'
+                        | b'G'
+                        | b'R'
+                        | b'L'
+                        | b'M'
+                        | b'I'
+                        | b'X'
+                        | b'0'
+                        | b'1'
+                        | b'2'
+                        | b'3'
+                        | b'4'
+                        | b'5'
+                        | b'6'
+                        | b'Z'
                 ) {
                     let commands: &[u8] = if byte == b'A' {
                         b"GRLMI"
@@ -142,8 +160,39 @@ fn main() -> ! {
                         core::slice::from_ref(&byte)
                     };
                     for &command in commands {
-                        let report: &[u8] = match isolated_check(&mut matrix.device, command) {
+                        let result = if command.is_ascii_digit() {
+                            if optical_saved.is_none() {
+                                optical_saved = Snapshot::capture(&mut matrix.device).ok();
+                            }
+                            if optical_saved.is_none() {
+                                Err("FAIL: optical snapshot\r\n")
+                            } else {
+                                optical_pattern(&mut matrix.device, command)
+                            }
+                        } else if command == b'Z' {
+                            match optical_saved.as_ref() {
+                                Some(saved) => {
+                                    let result = saved.restore(&mut matrix.device);
+                                    if result.is_ok() {
+                                        optical_saved = None;
+                                    }
+                                    result
+                                }
+                                None => Ok(()),
+                            }
+                        } else {
+                            isolated_check(&mut matrix.device, command)
+                        };
+                        let report: &[u8] = match result {
                             Ok(()) => match command {
+                                b'0' => b"PASS: optical uniform GCC0; held\r\n",
+                                b'1' => b"PASS: optical uniform GCC16; held\r\n",
+                                b'2' => b"PASS: optical uniform GCC64; held\r\n",
+                                b'3' => b"PASS: optical uniform GCC255; held\r\n",
+                                b'4' => b"PASS: optical sparse resistor disabled; held\r\n",
+                                b'5' => b"PASS: optical sparse resistor 8k; held\r\n",
+                                b'6' => b"PASS: optical sparse resistor 32k; held\r\n",
+                                b'Z' => b"PASS: optical state restored\r\n",
                                 b'G' => b"PASS: GCC; state restored\r\n",
                                 b'R' => b"PASS: resistors; state restored\r\n",
                                 b'L' => b"PASS: logic; state restored\r\n",
@@ -437,4 +486,35 @@ fn isolated_check<I: embedded_hal::i2c::I2c>(
     };
     saved.restore(d)?;
     result
+}
+
+// Optical patterns intentionally remain displayed until the next pattern or Z.
+fn optical_pattern<I: embedded_hal::i2c::I2c>(
+    d: &mut is31fl3741::IS31FL3741<I>,
+    mode: u8,
+) -> Result<(), &'static str> {
+    use is31fl3741::Resistor;
+    d.fill(0).map_err(|_| "FAIL: optical clear\r\n")?;
+    d.set_deghost_resistors(Resistor::KiloOhms8, Resistor::KiloOhms8)
+        .map_err(|_| "FAIL: optical resistor\r\n")?;
+    if mode <= b'3' {
+        let gcc = [0, 16, 64, 255][(mode - b'0') as usize];
+        d.set_global_current(gcc)
+            .map_err(|_| "FAIL: optical GCC\r\n")?;
+        d.fill(128).map_err(|_| "FAIL: optical fill\r\n")?;
+    } else {
+        let resistor = match mode {
+            b'4' => Resistor::Disabled,
+            b'5' => Resistor::KiloOhms8,
+            _ => Resistor::KiloOhms32,
+        };
+        d.set_global_current(255)
+            .map_err(|_| "FAIL: optical GCC\r\n")?;
+        d.set_deghost_resistors(resistor, resistor)
+            .map_err(|_| "FAIL: optical resistor\r\n")?;
+        for y in (1..34).step_by(4) {
+            d.pixel(4, y, 255).map_err(|_| "FAIL: optical pixel\r\n")?;
+        }
+    }
+    Ok(())
 }

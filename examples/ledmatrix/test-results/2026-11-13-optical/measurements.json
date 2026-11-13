@@ -1,0 +1,230 @@
+{
+  "camera": {
+    "exposure": "manual, exposure_time_absolute=50 (5 ms)",
+    "white_balance": "manual 4600 K",
+    "dynamic_framerate": false,
+    "crop_xyxy": [
+      175,
+      185,
+      490,
+      280
+    ],
+    "resolution": [
+      640,
+      480
+    ]
+  },
+  "driver": "9e7cae9",
+  "diagnostic_base": "2c958af plus optical modes in this commit",
+  "settings": {
+    "i2c_hz": 1000000,
+    "scaling": 50,
+    "pwm_frequency_hz": 29000,
+    "scan": "SW1-SW8",
+    "uniform_pwm": 128,
+    "sparse_pwm": 255
+  },
+  "sequence": [
+    {
+      "mode": "0",
+      "frames": [
+        {
+          "mean_rgb": 0.00068,
+          "rgb_sum": 61,
+          "saturated_channel_samples": 0
+        },
+        {
+          "mean_rgb": 0.00067,
+          "rgb_sum": 60,
+          "saturated_channel_samples": 0
+        },
+        {
+          "mean_rgb": 0.00068,
+          "rgb_sum": 61,
+          "saturated_channel_samples": 0
+        }
+      ]
+    },
+    {
+      "mode": "1",
+      "frames": [
+        {
+          "mean_rgb": 4.89507,
+          "rgb_sum": 439455,
+          "saturated_channel_samples": 0
+        },
+        {
+          "mean_rgb": 4.9024,
+          "rgb_sum": 440113,
+          "saturated_channel_samples": 0
+        },
+        {
+          "mean_rgb": 4.9104,
+          "rgb_sum": 440831,
+          "saturated_channel_samples": 0
+        }
+      ]
+    },
+    {
+      "mode": "2",
+      "frames": [
+        {
+          "mean_rgb": 16.31891,
+          "rgb_sum": 1465030,
+          "saturated_channel_samples": 25
+        },
+        {
+          "mean_rgb": 16.31696,
+          "rgb_sum": 1464855,
+          "saturated_channel_samples": 23
+        },
+        {
+          "mean_rgb": 16.32439,
+          "rgb_sum": 1465522,
+          "saturated_channel_samples": 24
+        }
+      ]
+    },
+    {
+      "mode": "3",
+      "frames": [
+        {
+          "mean_rgb": 36.75646,
+          "rgb_sum": 3299811,
+          "saturated_channel_samples": 653
+        },
+        {
+          "mean_rgb": 36.75606,
+          "rgb_sum": 3299775,
+          "saturated_channel_samples": 648
+        },
+        {
+          "mean_rgb": 36.75153,
+          "rgb_sum": 3299369,
+          "saturated_channel_samples": 650
+        }
+      ]
+    },
+    {
+      "mode": "4",
+      "frames": [
+        {
+          "mean_rgb": 1.29386,
+          "rgb_sum": 116156,
+          "saturated_channel_samples": 22
+        },
+        {
+          "mean_rgb": 1.29122,
+          "rgb_sum": 115919,
+          "saturated_channel_samples": 25
+        },
+        {
+          "mean_rgb": 1.29157,
+          "rgb_sum": 115951,
+          "saturated_channel_samples": 22
+        }
+      ]
+    },
+    {
+      "mode": "5",
+      "frames": [
+        {
+          "mean_rgb": 1.28211,
+          "rgb_sum": 115101,
+          "saturated_channel_samples": 25
+        },
+        {
+          "mean_rgb": 1.28656,
+          "rgb_sum": 115501,
+          "saturated_channel_samples": 23
+        },
+        {
+          "mean_rgb": 1.28824,
+          "rgb_sum": 115652,
+          "saturated_channel_samples": 25
+        }
+      ]
+    },
+    {
+      "mode": "6",
+      "frames": [
+        {
+          "mean_rgb": 1.28891,
+          "rgb_sum": 115712,
+          "saturated_channel_samples": 24
+        },
+        {
+          "mean_rgb": 1.28391,
+          "rgb_sum": 115263,
+          "saturated_channel_samples": 23
+        },
+        {
+          "mean_rgb": 1.28858,
+          "rgb_sum": 115682,
+          "saturated_channel_samples": 25
+        }
+      ]
+    },
+    {
+      "mode": "5",
+      "frames": [
+        {
+          "mean_rgb": 1.29031,
+          "rgb_sum": 115838,
+          "saturated_channel_samples": 25
+        },
+        {
+          "mean_rgb": 1.28716,
+          "rgb_sum": 115555,
+          "saturated_channel_samples": 25
+        },
+        {
+          "mean_rgb": 1.28743,
+          "rgb_sum": 115579,
+          "saturated_channel_samples": 25
+        }
+      ]
+    },
+    {
+      "mode": "4",
+      "frames": [
+        {
+          "mean_rgb": 1.29865,
+          "rgb_sum": 116586,
+          "saturated_channel_samples": 24
+        },
+        {
+          "mean_rgb": 1.30217,
+          "rgb_sum": 116902,
+          "saturated_channel_samples": 24
+        },
+        {
+          "mean_rgb": 1.2966,
+          "rgb_sum": 116402,
+          "saturated_channel_samples": 25
+        }
+      ]
+    },
+    {
+      "mode": "0",
+      "frames": [
+        {
+          "mean_rgb": 0.00049,
+          "rgb_sum": 44,
+          "saturated_channel_samples": 0
+        },
+        {
+          "mean_rgb": 0.00056,
+          "rgb_sum": 50,
+          "saturated_channel_samples": 0
+        },
+        {
+          "mean_rgb": 0.00049,
+          "rgb_sum": 44,
+          "saturated_channel_samples": 0
+        }
+      ]
+    }
+  ],
+  "interpretation": "Camera RGB means increase for GCC 0,16,64,255. These gamma-encoded camera measurements are not calibrated photometry. No conclusive resistor-dependent ghosting difference is visible at this exposure."
+}
