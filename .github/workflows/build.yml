@@ -21,7 +21,11 @@ jobs:
           filters: |
             rust:
               - '**.rs'
+              - '**/Cargo.toml'
               - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+              - '**/.cargo/**'
+              - 'README.md'
               - '.github/workflows/**'
       - if: steps.changes.outputs.rust == 'true'
         run: |
@@ -46,10 +50,16 @@ jobs:
           filters: |
             rust:
               - '**.rs'
+              - '**/Cargo.toml'
               - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+              - '**/.cargo/**'
+              - 'README.md'
               - '.github/workflows/**'
       - if: steps.changes.outputs.rust == 'true'
         run: |
-          cargo doc
-          cargo fmt --all -- --check
-          cargo clippy -- --deny=warnings
+          cargo test --all-features
+          cargo test --no-default-features
+          cargo doc --all-features
+          cargo clippy --all-features --all-targets -- --deny=warnings
+          cargo clippy --no-default-features --all-targets -- --deny=warnings

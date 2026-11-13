@@ -19,9 +19,11 @@ jobs:
             rust:
               - '**.rs'
               - 'rustfmt.toml'
+              - '**/Cargo.toml'
+              - 'rust-toolchain.toml'
               - '.github/workflows/**'
       - if: steps.changes.outputs.rust == 'true'
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
       - if: steps.changes.outputs.rust == 'true'
