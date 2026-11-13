@@ -3,8 +3,11 @@
 Compared against IS31FL3741A datasheet Rev. D, November 6, 2024, on November 13, 2026.
 Local source: `~/Documents/datasheets/IS31FL3741A_DS.pdf`.
 
-This is a static code and datasheet review. Findings have not been verified on hardware.
-Check an item when it has been fixed or explicitly resolved.
+This started as a static code and datasheet review; selected findings now have host and Framework hardware validation. Original findings below describe the reviewed code, not necessarily the current implementation.
+
+Check an item when it has been fixed or explicitly resolved and its relevant checks are complete. Unchecked items may be partially implemented: consult their **Status** notes. **Automated**, **Hardware**, and **Review/build** paragraphs describe planned checks, not claims that every listed check ran. Actual hardware evidence is in [HARDWARE_TEST_RESULTS.md](examples/ledmatrix/HARDWARE_TEST_RESULTS.md), committed with the expanded diagnostic in `9dfce47`.
+
+Update this checklist as each item progresses, in the same commit as the change or its validation evidence. Record actual baseline/fixed outcomes and remaining limitations; never infer a hardware pass from compilation or mock tests.
 
 ## Implementation plan
 
@@ -15,15 +18,15 @@ For each item:
 
 - Test without the fix first, to get a baseline
 - Test the fix
-- Commit. The message must include that how it was tested. But only what you actually tested. No hypotheticals
+- Update this checklist with the actual result and remaining gaps, then commit. The message must include how it was tested, but only what actually ran. No hypotheticals.
 
 ## Test approach
 
 Use a recording/scripted `embedded_hal::i2c::I2c` mock for register transactions, decoding, boundary cases, and error propagation. These tests do not require attached hardware. Add regression tests with each substantive fix/API rather than tests that only repeat constants.
 
-Use the existing `examples/ledmatrix` RP2040 firmware as the starting point for a hardware diagnostic. It already selects `Sw1Sw8`, matching the Framework mapping. A diagnostic needs a way to report errors and register dumps over USB/serial, plus register-read support (currently private in the driver). Any diagnostic page selection must use the unlock sequence and restore state or reinitialize between cases.
+Use the existing `examples/ledmatrix` RP2040 firmware as the starting point for a hardware diagnostic. It already selects `Sw1Sw8`, matching the Framework mapping. The persistent `hardware_check` example reports test results over USB serial and uses diagnostic-local I²C reads; driver register helpers remain private. Any diagnostic page selection must use the unlock sequence and restore state or reinitialize between cases.
 
-Before flashing, identify the attached board and firmware recovery path, confirm its chip marking/revision against this **A** datasheet, and choose modest scaling/GCC for visible tests. Firmware flashing and physical fault injection have not been performed as part of this review. Register readback and optical observation complement mock tests; they do not replace them. Framework hardware does not validate Adafruit-specific layout behavior.
+Before flashing, identify the attached board and firmware recovery path, confirm its chip marking/revision against this **A** datasheet, and choose modest scaling/GCC for visible tests. Firmware flashing and register tests have been performed; physical fault injection has not. Physical chip marking and board revision remain uninspected. Register readback and optical observation complement mock tests; they do not replace them. Framework hardware does not validate Adafruit-specific layout behavior.
 
 Record firmware revision, board revision, settings, expected/observed values, and pass/fail for each hardware run. Leave items unchecked until their implementation/documentation resolution and relevant checks are complete; explicitly record hardware checks that remain unavailable.
 
@@ -35,27 +38,37 @@ These have a clear expected behavior and can be implemented independently withou
 
 Small, focused changes with existing APIs and clear regression cases.
 
-- [ ] **Fix the PG1 transfer length in `fill_matrix()`.**
+- [x] **Fix the PG1 transfer length in `fill_matrix()`.**
+  **Status:** Fixed in `3e73edd`. Host patterned-frame regression passed. Hardware baseline `21c5c1a` failed full PWM readback; fixed `9e7cae9` passed three times. See `9dfce47` evidence.
+
   In `src/lib.rs`, the second transfer uses `&buf[..=0xAA]`: 171 bytes including the register address, so only 170 PWM values are sent. PG1 has 171 registers (`0x00–0xAA`), leaving the final channel unchanged. Use `&buf[..=0xAB]`, as in `fill()` and `set_scaling()`. See datasheet Table 7, p. 11.
 
   **Automated:** Send a 351-byte pattern with distinct values at indices 179, 180, 349, and 350 through a recording I²C mock. Assert the two payloads cover exactly PG0 `0x00–0xB3` and PG1 `0x00–0xAA`, including the last value. **Hardware:** Read back all PWM registers and compare against the pattern. The Framework mapping does not use SW9, so PG1 `0xAA` (SW9/CS39) has no visible LED on this board; a visual test alone cannot catch this bug.
 
-- [ ] **Preserve configuration bits in `shutdown()`.**
+- [x] **Preserve configuration bits in `shutdown()`.**
+  **Status:** Fixed in `0d38b86`. Host test covers all 256 configuration bytes and both shutdown states. Hardware baseline `3e73edd` failed preservation; fixed `9e7cae9` passed three times. Subsequent baseline requests failed initial-state checks because the first failure left shutdown active; this limitation is recorded in the hardware report. Optical blanking was not separately measured.
+
   Writing the whole configuration register as `0` or `1` clears the scan-row selection, logic threshold, and detection bits. Modify only SSD (bit 0), preserving the other bits. In particular, shutdown must retain a previous `sw_enablement()` setting. See Table 11, p. 14.
 
   **Automated:** Start with each valid SWS value and both LGC values; exercise shutdown on/off and assert only bit 0 changes. Include OSDE bits in the preservation check without repeatedly triggering detection on hardware. **Hardware:** Select `Sw1Sw8`, capture PG4 `0x00`, cycle shutdown, and read it again. Expect `0x10` while shut down and `0x11` when running if other bits are zero. Confirm blanking and restoration of the same LED pattern. Register readback is the decisive scan-setting check.
 
-- [ ] **Fix core pixel coordinate bounds.**
+- [x] **Fix core pixel coordinate bounds.**
+  **Status:** Fixed in `21c5c1a`. Host boundary checks pass. Hardware baseline `7d71c1a` failed coordinate rejection; fixed `9e7cae9` passed three times, including corner register-image checks. Camera still showed four bright corners.
+
   `pixel()` uses `x > width` and `y > height`; these must be `>=` because dimensions are counts. Currently an invalid coordinate can reach the mapping callback, write the wrong LED, or panic.
 
   **Automated:** For a 9×34 device, accept `(0,0)` and `(8,33)`; reject `(9,0)`, `(0,34)`, `(9,34)`, and coordinates of 255. Invalid calls must invoke neither the mapping callback nor I²C. **Hardware:** Display the four valid corner pixels, then issue invalid calls and confirm errors with the displayed pattern unchanged.
 
-- [ ] **Fix Adafruit graphics clipping.**
+- [x] **Fix Adafruit graphics clipping.**
+  **Status:** Fixed in `21c5c1a`. Host clipping regression failed on the parent and passes with the fix; retained suite passes in debug and release. No Adafruit hardware validation: Framework wiring cannot establish RGB layout or output.
+
   `DrawTarget::draw_iter()` accepts `0..=13` and `0..=9`. Valid coordinates are `0..13` and `0..9`. Out-of-bounds graphics pixels must be discarded.
 
   **Automated:** With both Adafruit and graphics features enabled, draw valid corners plus negative coordinates, `(13,0)`, `(0,9)`, and large signed coordinates. Expect success overall and writes only for valid pixels. **Hardware:** Framework hardware cannot validate the Adafruit wiring or RGB output; use mock coverage for this item.
 
-- [ ] **Validate RGB coordinates before flattening.**
+- [x] **Validate RGB coordinates before flattening.**
+  **Status:** Fixed in `21c5c1a`. Host invalid-coordinate regression failed on the parent and passes with the fix; retained suite passes in debug and release and exercises the last valid pixel. No Adafruit hardware validation.
+
   `AdafruitRGB13x9::pixel_rgb()` computes `x + y * 13` before checking the original coordinates. For example, `(13, 0)` aliases `(0, 1)`. Larger inputs can overflow `u8` arithmetic or access an invalid lookup index. Reject `x >= 13` or `y >= 9` before computing the index.
 
   **Automated:** Accept `(0,0)` and `(12,8)` and check their three mapped channel writes. Reject `(13,0)`, `(0,9)`, and inputs containing 255 without any I²C writes. Run in debug and release to catch arithmetic differences. Check that invalid `(13,0)` never updates valid `(0,1)`. **Hardware:** Adafruit-specific; no additional Framework test is needed.
@@ -64,17 +77,23 @@ Small, focused changes with existing APIs and clear regression cases.
 
 No behavioral decision is needed for these wording fixes.
 
-- [ ] **Correct the documented I²C address.**
+- [x] **Correct the documented I²C address.**
+  **Status:** Corrected in `0343f73`. Before/after wording checked; `cargo doc --all-features --no-deps` passed. Matrix tests communicate at `0x30`; ID readback and alternate physical straps were not tested.
+
   The `address` field documentation suggests `0x74`; supported seven-bit addresses are `0x30–0x33`, selected by ADDR wiring. The ID example `0x60` is the corresponding eight-bit address byte for seven-bit address `0x30`. See Table 1, p. 7, and ID register description, p. 10.
 
   **Review/build:** Cross-check the four seven-bit addresses and ADDR pin connections against Table 1; ensure examples use seven-bit addresses. **Hardware:** At the board’s existing strap setting, verify ACK at the configured address and read the ID (`0x60` for address `0x30`). Other strap settings need suitable hardware access and are not required to validate this board.
 
-- [ ] **Clarify `set_address()` documentation.**
+- [x] **Clarify `set_address()` documentation.**
+  **Status:** Corrected in `2ca9a30`. Before/after wording checked and documentation build passed. Retained host address-targeting test passes; no hardware address-programming claim is made.
+
   This changes the address targeted by the driver, not the chip's hardware address, which is selected by the ADDR pin.
 
   **Automated:** Change the driver target address and verify subsequent mock transactions use it, with no address-programming register write. **Hardware:** No extra test is needed; switching to an unpopulated address would only demonstrate a NACK, not hardware address programmability.
 
-- [ ] **Correct setup's “maximum voltage” wording.**
+- [x] **Correct setup's “maximum voltage” wording.**
+  **Status:** Corrected in `b53dbe3`. Before/after wording checked and documentation build passed. No runtime test was needed for this wording correction.
+
   Setup sets maximum global current control, not voltage.
 
   **Review:** Confirm the text describes GCC/current control and does not claim to configure voltage. No dedicated runtime test is needed; the global-current and setup checks cover the behavior.
@@ -84,26 +103,36 @@ No behavioral decision is needed for these wording fixes.
 The register behavior is defined. Choose names consistent with the driver, preserve unrelated fields, and avoid changing setup defaults. These are optional features rather than prerequisites for the bug fixes.
 
 - [ ] **Expose global current control.**
+  **Status:** Implemented in `534400e`; partially verified. Missing-method compile baseline only, not an on-device failure baseline. Host case passes. Fixed-only hardware readback passed for GCC 0, 1, 32, 128, and 255 on three runs (`9dfce47`). Optical brightness sweep and broader host/error coverage remain pending.
+
   PG4 `0x01` is currently hardcoded to `0xFF` during setup. Add a public setter. See Table 12, p. 14.
 
   **Automated:** Check exact PG4 `0x01` writes for 0, 1, 128, and 255, with no changes to PWM/scaling. **Hardware:** Hold PWM and scaling fixed, sweep GCC from 0 through several modest levels, and confirm blank at zero and increasing brightness. Read GCC back. A photodiode or fixed-exposure camera can quantify brightness; USB power includes controller overhead and is not a direct LED-current measurement.
 
 - [ ] **Expose de-ghost resistor selection.**
+  **Status:** Implemented in `78fb89a`; partially verified. Missing-method compile baseline only. One host encoding case passes; all 64 combinations passed hardware register readback on three runs (`9dfce47`). Optical ghosting comparison and broader host/error coverage remain pending.
+
   Add configuration for CS pull-up and SW pull-down resistors through PG4 `0x02`. `PULL_UP_REGISTER` exists but has no associated API. Follow Rev. D's corrected PUR/PDR definitions. See Table 13, p. 15.
 
   **Automated:** Exercise all eight PUR and PDR encodings independently. Assert PDR occupies bits 6:4, PUR bits 2:0, and reserved bits stay zero. **Hardware:** Read PG4 `0x02` back after selecting asymmetric settings to catch swapped fields. Compare sparse bright patterns on a dark background across resistor settings using fixed exposure. No visible ghosting is not proof that selection is broken; register readback verifies configuration, while the optical test evaluates this board’s behavior.
 
 - [ ] **Expose interrupt configuration.**
+  **Status:** Implemented in `bed1985`; partially verified. Missing-method compile baseline only. One host mask case passes; all eight combinations received hardware ACKs (`9dfce47`). Actual event masking, INTB behavior, and auto-clear timing remain unverified. Diagnostic firmware configures GPIO28 as INTB input but does not test it.
+
   Implement `0xF0` open/short interrupt enables and the auto-clear option. See Table 5, p. 10.
 
   **Automated:** Verify all combinations of IO, IS, and IAC encode into bits 0, 1, and 4 of global register `0xF0`; no reserved bits are set. It is write-only, so do not depend on readback. **Hardware:** First check the schematic for INTB routing and probe access. If accessible, use a logic analyzer/scope and a reproducible detection event to compare enabled/disabled masks and the documented auto-clear behavior after more than 8 ms. Without INTB access, mark electrical interrupt behavior unverified.
 
 - [ ] **Expose interrupt status.**
+  **Status:** Implemented in `ba5b4b7`; partially verified. Missing-method compile baseline only. One host decoding case passes and hardware status access succeeded (`9dfce47`). Complete synthetic status/error coverage and correlation with known detection events remain pending.
+
   Read open/short status from `0xF1`. See Table 6, p. 10.
 
   **Automated:** Supply `0x00`, `0x01`, `0x02`, and `0x03` from global register `0xF1` and check decoding of no fault, open, short, and both. Mask reserved bits and propagate bus errors. **Hardware:** Compare status with separate open/short detection reports and, if accessible, INTB. Record status before and after repeated reads to characterize any clearing behavior rather than assuming it.
 
 - [ ] **Expose logic-threshold selection.**
+  **Status:** Implemented in `9e7cae9`; partially verified. Missing-method compile baseline only. One host preservation case passes; both selections passed hardware configuration readback with continued communication on three runs (`9dfce47`). Broader host preservation/error coverage remains pending. Actual electrical thresholds were not measured.
+
   Configuration bit 3 selects 1.4V/0.4V or 2.4V/0.6V thresholds. Preserve the other configuration bits. See Table 11, p. 14.
 
   **Automated:** Toggle bit 3 while preserving SWS, OSDE, and SSD. **Hardware:** Read the configuration back for both selections and confirm communication remains functional at the board’s normal I/O voltage. Actual threshold validation needs controlled logic amplitudes and suitable equipment; successful communication alone does not measure the thresholds.
@@ -117,6 +146,8 @@ These involve an API contract, compatibility choice, hardware uncertainty, or a 
 Settle these before expanding the API surface or changing existing caller behavior.
 
 - [ ] **Validate `fill_matrix()` input length before any I²C writes.**
+  **Status:** Partial fix in `3e73edd`: short inputs now assert before I²C access; extra values are documented as ignored. Host tests cover panic-before-write for lengths 0, 179, 180, and 350 and ignored extra data at length 352. The planned recoverable-error versus fixed-array contract remains undecided; do not describe partial hardware writes as current behavior.
+
   **Decision:** Keep a slice and return a validation error, or require a fixed-size array? Decide whether extra bytes are accepted and account for return-type/caller compatibility. The current short-input assertion prevents partial writes but still panics.
 
   The function needs 351 bytes but accepts an arbitrary slice. Short input panics; with 180–350 bytes it can panic after updating PG0. Validate up front and return an error, or accept `&[u8; 351]`.
@@ -164,7 +195,7 @@ These need a defined lifecycle and hardware evidence, beyond correct register en
 
 ### Performance and memory tradeoffs
 
-Transaction counts are source-level estimates, not measured speedups. Resolve correctness issues before optimizing. The current working tree includes a PG1 length correction and an up-front short-input assertion; those still need verification under their checklist items.
+Transaction counts are source-level estimates, not measured speedups. Resolve correctness issues before optimizing. Commit `3e73edd` includes the PG1 length correction and an up-front short-input assertion. Frame readback has before/after hardware evidence; the assertion has host coverage, while its longer-term error contract remains undecided.
 
 - [ ] **Use bulk writes for Framework uniform fills.**
   **Decision:** May a Framework fill overwrite unmapped channels, and what guarantee applies to custom mappings? Choose semantics before replacing the current loop.
