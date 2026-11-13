@@ -178,3 +178,13 @@ fn interrupt_config_regression() {
     device.set_interrupt_config(true, true, true).unwrap();
     assert_eq!(device.i2c.writes, [vec![0xf0, 0x13]]);
 }
+
+#[test]
+fn interrupt_status_regression() {
+    let mut device = driver();
+    device.i2c.read_value = 0xfd;
+    let status = device.read_interrupt_status().unwrap();
+    assert!(status.open);
+    assert!(!status.short);
+    assert_eq!(device.i2c.writes, [vec![0xf1]]);
+}
