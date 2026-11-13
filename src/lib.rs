@@ -189,6 +189,14 @@ impl<I2C: I2c> IS31FL3741<I2C> {
         })
     }
 
+    /// Select the high/low input logic thresholds
+    ///
+    /// Preserves the register's shutdown, scan, and open/short detection settings.
+    pub fn set_logic_threshold(&mut self, threshold: LogicThreshold) -> Result<(), I2C::Error> {
+        let v = self.read_register(Page::Config, 0)?;
+        self.write_register(Page::Config, 0, (v & !8) | threshold as u8)
+    }
+
     fn write(&mut self, buf: &[u8]) -> Result<(), I2C::Error> {
         self.i2c.write(self.address, buf)
     }
@@ -325,4 +333,14 @@ pub struct InterruptStatus {
     pub open: bool,
     /// An LED short fault occurred.
     pub short: bool,
+}
+
+/// High/low input logic thresholds selected by the LGC configuration bit.
+#[derive(Clone, Copy, Debug)]
+#[repr(u8)]
+pub enum LogicThreshold {
+    /// High at 1.4 V or above; low at 0.4 V or below (reset default).
+    High1V4Low0V4 = 0,
+    /// High at 2.4 V or above; low at 0.6 V or below.
+    High2V4Low0V6 = 8,
 }
