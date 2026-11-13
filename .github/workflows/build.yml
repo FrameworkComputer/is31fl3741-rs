@@ -21,6 +21,7 @@ jobs:
           filters: |
             rust:
               - '**.rs'
+              - 'tests/**'
               - '**/Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain.toml'
@@ -50,6 +51,7 @@ jobs:
           filters: |
             rust:
               - '**.rs'
+              - 'tests/**'
               - '**/Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain.toml'
@@ -61,6 +63,9 @@ jobs:
           cargo test --all-features
           cargo test --all-features --release
           cargo test --no-default-features
+          cargo test --no-default-features --features framework_ledmatrix
+          cargo test --no-default-features --features adafruit_rgb_13x9
+          cargo test --no-default-features --features adafruit_rgb_13x9,embedded_graphics
           cargo doc --all-features
           cargo clippy --all-features --all-targets -- --deny=warnings
           cargo clippy --no-default-features --all-targets -- --deny=warnings

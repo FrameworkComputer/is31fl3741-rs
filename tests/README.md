@@ -35,3 +35,16 @@ suite does not establish optical output or electrical behavior.
 fixtures captured before the static-table optimization. It also checks register
 ranges and channel uniqueness. These fixtures establish compatibility with the
 reviewed mappings, not independent verification of an Adafruit PCB schematic.
+
+CI also runs each device independently without default features, so enabling all
+features cannot hide missing feature gates:
+
+```sh
+cargo test --no-default-features --features framework_ledmatrix
+cargo test --no-default-features --features adafruit_rgb_13x9
+cargo test --no-default-features --features adafruit_rgb_13x9,embedded_graphics
+```
+
+Changes anywhere under `tests/`, including frozen CSV fixtures, trigger the Rust
+workflow checks. Workflow test commands were run locally; that is separate from
+an actual GitHub Actions run.
