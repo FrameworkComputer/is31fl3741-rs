@@ -156,3 +156,12 @@ An empty bitmap will fail the check rather than silently passing. Short-event
 signaling is tested, but the short bitmap's physical meaning is unresolved;
 no artificial short is introduced. Exact evidence and limitations are retained
 in `test-results/2026-11-13-interrupts`.
+
+For a longer-exposure sparse comparison, use `--exposure 500 --sequence 0456540`.
+Exposure is in 100us units; the default 50 is 5ms. Sequences must start with mode
+0 to establish a dark reference. Each lit crop must exceed that reference by
+`--min-lit-increase` (default 0.05 RGB camera sample units), otherwise capture
+fails and cleanup still runs. This rejects a missing/off-target lit pattern;
+it does not verify perfect framing or calibrated brightness. Camera subprocesses
+have a 30-second timeout. The later longer-exposure run used crop
+`200 330 465 420`; always verify the framing for the current camera position.

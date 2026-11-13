@@ -148,3 +148,21 @@ Clippy/build, 25 all-feature host tests, strict host Clippy, docs, and whitespac
 checks passed. Register state was restored after each case; diagnostic remains
 loaded for further optical investigation rather than claiming a firmware restore
 at this intermediate step.
+
+## Longer-exposure follow-up and rejected framing
+
+See `test-results/2026-11-13-ghosting-long-exposure`. The initial 50ms run used
+an outdated crop and yielded nearly black lit frames; human inspection rejected
+it. The new visibility guard repeated that failure as an explicit exit1 and
+still restored state. A corrected crop completed seven dark/sparse settings and
+retains cropped evidence and three-frame metrics. No conclusive resistor-dependent
+ghosting change was established. This leaves de-ghost efficacy unverified.
+Post-run T and five A reports passed. Camera controls read back restored:
+auto_exposure3, exposure156, dynamic_framerate1, automatic_white_balance1.
+Normal ledtest with the verified static tables was restored and serial enumeration
+confirmed after the interrupt/optical investigations.
+
+Restoration sequencing correction: the first final-flash attempt timed out waiting
+for automount. The RPI-RP2 volume was then explicitly mounted and restoration was
+retried successfully; application serial enumeration was observed only after that
+retry. The final restoration claim refers to that completed retry, not the timeout.

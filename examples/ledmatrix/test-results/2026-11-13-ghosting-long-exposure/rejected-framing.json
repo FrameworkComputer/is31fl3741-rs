@@ -1,0 +1,228 @@
+{
+  "old_crop": [
+    175,
+    185,
+    490,
+    280
+  ],
+  "corrected_crop": [
+    200,
+    330,
+    465,
+    420
+  ],
+  "before_visibility_guard": {
+    "original_controls": {
+      "auto_exposure": 3,
+      "exposure_time_absolute": 156,
+      "exposure_dynamic_framerate": 1,
+      "white_balance_automatic": 1,
+      "white_balance_temperature": 4600
+    },
+    "capture_controls": {
+      "auto_exposure": 1,
+      "exposure_time_absolute": 500,
+      "exposure_dynamic_framerate": 0,
+      "white_balance_automatic": 0,
+      "white_balance_temperature": 4600
+    },
+    "crop_xyxy": [
+      175,
+      185,
+      490,
+      280
+    ],
+    "sequence": [
+      {
+        "mode": "0",
+        "report": "PASS: optical uniform GCC0; held",
+        "frames": [
+          {
+            "mean_rgb": 0.0,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.0,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.0,
+            "saturated_channel_samples": 0
+          }
+        ]
+      },
+      {
+        "mode": "4",
+        "report": "PASS: optical sparse resistor disabled; held",
+        "frames": [
+          {
+            "mean_rgb": 0.00013366750208855473,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.00013366750208855473,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.00013366750208855473,
+            "saturated_channel_samples": 0
+          }
+        ]
+      },
+      {
+        "mode": "5",
+        "report": "PASS: optical sparse resistor 8k; held",
+        "frames": [
+          {
+            "mean_rgb": 6.683375104427736e-05,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 4.455583402951824e-05,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 6.683375104427736e-05,
+            "saturated_channel_samples": 0
+          }
+        ]
+      },
+      {
+        "mode": "6",
+        "report": "PASS: optical sparse resistor 32k; held",
+        "frames": [
+          {
+            "mean_rgb": 0.0001113895850737956,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 6.683375104427736e-05,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 8.911166805903648e-05,
+            "saturated_channel_samples": 0
+          }
+        ]
+      },
+      {
+        "mode": "5",
+        "report": "PASS: optical sparse resistor 8k; held",
+        "frames": [
+          {
+            "mean_rgb": 0.00015594541910331385,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.00013366750208855473,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.00015594541910331385,
+            "saturated_channel_samples": 0
+          }
+        ]
+      },
+      {
+        "mode": "4",
+        "report": "PASS: optical sparse resistor disabled; held",
+        "frames": [
+          {
+            "mean_rgb": 0.00017822333611807297,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.00020050125313283206,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.00017822333611807297,
+            "saturated_channel_samples": 0
+          }
+        ]
+      },
+      {
+        "mode": "0",
+        "report": "PASS: optical uniform GCC0; held",
+        "frames": [
+          {
+            "mean_rgb": 0.0,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.0,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.0,
+            "saturated_channel_samples": 0
+          }
+        ]
+      }
+    ]
+  },
+  "after_visibility_guard": {
+    "original_controls": {
+      "auto_exposure": 3,
+      "exposure_time_absolute": 156,
+      "exposure_dynamic_framerate": 1,
+      "white_balance_automatic": 1,
+      "white_balance_temperature": 4600
+    },
+    "capture_controls": {
+      "auto_exposure": 1,
+      "exposure_time_absolute": 500,
+      "exposure_dynamic_framerate": 0,
+      "white_balance_automatic": 0,
+      "white_balance_temperature": 4600
+    },
+    "crop_xyxy": [
+      175,
+      185,
+      490,
+      280
+    ],
+    "min_lit_increase": 0.05,
+    "sequence": [
+      {
+        "mode": "0",
+        "report": "PASS: optical uniform GCC0; held",
+        "frames": [
+          {
+            "mean_rgb": 0.0,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.0,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.0,
+            "saturated_channel_samples": 0
+          }
+        ],
+        "visibility_check_passed": true
+      },
+      {
+        "mode": "4",
+        "report": "PASS: optical sparse resistor disabled; held",
+        "frames": [
+          {
+            "mean_rgb": 0.00013366750208855473,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.0002227791701475912,
+            "saturated_channel_samples": 0
+          },
+          {
+            "mean_rgb": 0.0002227791701475912,
+            "saturated_channel_samples": 0
+          }
+        ],
+        "visibility_check_passed": false
+      }
+    ]
+  },
+  "outcome": "Old script completed despite invisible lit patterns; guarded script rejected the wrong crop with exit 1 and restored matrix/camera state. Corrected crop passed all seven settings."
+}

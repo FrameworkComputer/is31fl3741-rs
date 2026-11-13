@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw, ImageStat
 
 
 def run(*args):
-    return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT)
+    return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT, timeout=30)
 
 
 def request(fd, command):
@@ -39,7 +39,12 @@ def main():
     parser.add_argument("--camera", default="/dev/video0")
     parser.add_argument("--output", type=Path, required=True, help="New, empty evidence directory")
     parser.add_argument("--crop", type=int, nargs=4, default=[175, 185, 490, 280], metavar=("LEFT", "TOP", "RIGHT", "BOTTOM"))
+    parser.add_argument("--exposure", type=int, default=50, help="Manual exposure in 100us units (default 50 = 5ms)")
+    parser.add_argument("--sequence", default="0123456540", help="Optical mode digits 0-6, in capture order")
+    parser.add_argument("--min-lit-increase", type=float, default=0.05, help="Minimum lit-crop RGB mean increase over the dark baseline")
     args = parser.parse_args()
+    if not 2 <= args.exposure <= 1250 or not args.sequence or args.sequence[0] != "0" or args.min_lit_increase < 0 or any(c not in "0123456" for c in args.sequence):
+        parser.error("Use exposure 2-1250, a sequence starting with dark mode 0, and a nonnegative visibility threshold")
     args.output.mkdir(parents=True, exist_ok=False)
     controls = ["auto_exposure", "exposure_time_absolute", "exposure_dynamic_framerate", "white_balance_automatic", "white_balance_temperature"]
     original = {}
@@ -55,11 +60,12 @@ def main():
     attributes[4] = attributes[5] = termios.B115200
     termios.tcsetattr(fd, termios.TCSANOW, attributes)
     records = []
+    dark_mean = None
     try:
-        for name, value in [("auto_exposure", 1), ("exposure_time_absolute", 50), ("exposure_dynamic_framerate", 0), ("white_balance_automatic", 0), ("white_balance_temperature", 4600)]:
+        for name, value in [("auto_exposure", 1), ("exposure_time_absolute", args.exposure), ("exposure_dynamic_framerate", 0), ("white_balance_automatic", 0), ("white_balance_temperature", 4600)]:
             set_control(name, value)
         with tempfile.TemporaryDirectory(prefix="is31-optical-") as temporary:
-            for index, command in enumerate("0123456540"):
+            for index, command in enumerate(args.sequence):
                 report = request(fd, command)
                 time.sleep(0.5)
                 pattern = str(Path(temporary) / "frame-%02d.png")
@@ -76,8 +82,14 @@ def main():
                         values.append({"mean_rgb": mean, "saturated_channel_samples": clipped})
                         if frame == 1:
                             crop.save(args.output / f"{index:02}-mode-{command}.png")
-                records.append({"mode": command, "report": report, "frames": values})
-                (args.output / "measurements.json").write_text(json.dumps({"original_controls": original, "capture_controls": {"auto_exposure": 1, "exposure_time_absolute": 50, "exposure_dynamic_framerate": 0, "white_balance_automatic": 0, "white_balance_temperature": 4600}, "crop_xyxy": args.crop, "sequence": records}, indent=2) + "\n")
+                measured_mean = sum(value["mean_rgb"] for value in values) / len(values)
+                if command == "0" and dark_mean is None:
+                    dark_mean = measured_mean
+                visible = command == "0" or measured_mean > dark_mean + args.min_lit_increase
+                records.append({"mode": command, "report": report, "frames": values, "visibility_check_passed": visible})
+                (args.output / "measurements.json").write_text(json.dumps({"original_controls": original, "capture_controls": {"auto_exposure": 1, "exposure_time_absolute": args.exposure, "exposure_dynamic_framerate": 0, "white_balance_automatic": 0, "white_balance_temperature": 4600}, "crop_xyxy": args.crop, "min_lit_increase": args.min_lit_increase, "sequence": records}, indent=2) + "\n")
+                if not visible:
+                    raise RuntimeError("Lit pattern is not visible above the dark baseline in this crop; check framing/exposure before accepting evidence")
         width, height = args.crop[2] - args.crop[0], args.crop[3] - args.crop[1]
         sheet = Image.new("RGB", (width, (height + 24) * len(records)))
         draw = ImageDraw.Draw(sheet)

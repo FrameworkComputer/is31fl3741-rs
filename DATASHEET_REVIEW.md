@@ -110,7 +110,7 @@ The register behavior is defined. Choose names consistent with the driver, prese
   **Automated:** Check exact PG4 `0x01` writes for 0, 1, 128, and 255, with no changes to PWM/scaling. **Hardware:** Hold PWM and scaling fixed, sweep GCC from 0 through several modest levels, and confirm blank at zero and increasing brightness. Read GCC back. A photodiode or fixed-exposure camera can quantify brightness; USB power includes controller overhead and is not a direct LED-current measurement.
 
 - [ ] **Expose de-ghost resistor selection.**
-  **Status:** Implemented in `78fb89a`; partially verified. Missing-method compile baseline only. One host encoding case passes; all 64 combinations passed hardware register readback on three runs (`9dfce47`). All 64 encodings and bus-failure host coverage pass. Camera comparison of disabled/8kΩ/32kΩ shows no conclusive ghosting difference at this exposure; efficacy remains unverified. Register configuration is verified.
+  **Status:** Implemented in `78fb89a`; partially verified. Missing-method compile baseline only. One host encoding case passes; all 64 combinations passed hardware register readback on three runs (`9dfce47`). All 64 encodings and bus-failure host coverage pass. Camera comparisons at 5ms and, with corrected framing, 50ms show no conclusive resistor-dependent ghosting change; efficacy remains unverified. The capture tool now rejects invisible lit patterns against a dark reference. Register configuration is verified.
 
   Add configuration for CS pull-up and SW pull-down resistors through PG4 `0x02`. `PULL_UP_REGISTER` exists but has no associated API. Follow Rev. D's corrected PUR/PDR definitions. See Table 13, p. 15.
 
@@ -262,3 +262,5 @@ Transaction counts are source-level estimates, not measured speedups. Resolve co
 - [x] Preserve exhaustive mapping fixtures and a repeatable Cortex-M0+ measurement probe. Both fixture tests pass before/after the static-table change; 25 all-feature debug/release tests, 21 no-default tests, and strict host/diagnostic Clippy pass.
 
 - [x] Investigate INTB/status/event behavior using existing board wiring. Three permanent hardware regression runs pass open-map, masking, read-ack, auto-clear interval, and short-event signaling checks. Diagnostic snapshots now include scaling. Full reports and limits are retained under `examples/ledmatrix/test-results/2026-11-13-interrupts`.
+
+- [x] Reject off-target camera evidence automatically and repeat de-ghost comparison at longer exposure. Baseline script completed an outdated-crop run despite nearly black lit frames; new visibility guard rejected it (exit1) and restored state. Corrected-crop 50ms run completed seven settings. No conclusive electronic ghosting difference was established. Evidence/limits are in the longer-exposure results directory; matrix T/A and camera-restoration checks pass, and normal firmware is restored.
