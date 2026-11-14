@@ -279,10 +279,7 @@ fn main() -> ! {
                 boot_command_prefix = match (boot_command_prefix, byte) {
                     (0, 0x32) => 1,
                     (1, 0xac) => 2,
-                    (2, 2) => {
-                        reset_to_usb_boot(0, 0);
-                        0
-                    }
+                    (2, 2) => reset_to_usb_boot(0, 0),
                     (_, 0x32) => 1,
                     _ => 0,
                 };
