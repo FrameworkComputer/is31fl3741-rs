@@ -120,10 +120,11 @@ impl<I2C: I2c> IS31FL3741<I2C> {
 
     /// Put the device into software shutdown mode
     pub fn shutdown(&mut self, yes: bool) -> Result<(), I2C::Error> {
+        let config_register = self.read_register(Page::Config, addresses::CONFIG_REGISTER)?;
         self.write_register(
             Page::Config,
             addresses::CONFIG_REGISTER,
-            if yes { 0 } else { 1 },
+            (config_register & !1) | if yes { 0 } else { 1 },
         )?;
         Ok(())
     }
@@ -145,6 +146,56 @@ impl<I2C: I2c> IS31FL3741<I2C> {
     /// Set the global current
     pub fn set_global_current(&mut self, current: u8) -> Result<(), I2C::Error> {
         self.write_register(Page::Config, addresses::CURRENT_REGISTER, current)
+    }
+
+    /// Set the SWx pull-down and CSy pull-up resistors used to reduce LED ghosting.
+    ///
+    /// The resistors act during scan blanking to prevent LEDs that should be off
+    /// from glowing due to parasitic capacitance. Use [`Resistor::Disabled`] to
+    /// disable either pull independently.
+    pub fn set_deghost_resistors(
+        &mut self,
+        pull_down: Resistor,
+        pull_up: Resistor,
+    ) -> Result<(), I2C::Error> {
+        self.write_register(Page::Config, 2, (pull_down as u8) << 4 | pull_up as u8)
+    }
+
+    /// Configure which LED faults assert the active-low INTB interrupt output.
+    ///
+    /// `open` enables interrupts for open LEDs; `short` enables interrupts for
+    /// shorted LEDs. If `auto_clear` is true, the interrupt automatically clears
+    /// after INTB has been low for more than 8 ms.
+    pub fn set_interrupt_config(
+        &mut self,
+        open: bool,
+        short: bool,
+        auto_clear: bool,
+    ) -> Result<(), I2C::Error> {
+        self.write(&[
+            0xf0,
+            u8::from(open) | u8::from(short) << 1 | u8::from(auto_clear) << 4,
+        ])
+    }
+
+    /// Read the LED open and short interrupt flags.
+    ///
+    /// These flags report whether an open or short fault occurred, without
+    /// identifying the affected LEDs.
+    pub fn read_interrupt_status(&mut self) -> Result<InterruptStatus, I2C::Error> {
+        let v = self.read_u8(0xf1)?;
+        Ok(InterruptStatus {
+            open: v & 1 != 0,
+            short: v & 2 != 0,
+        })
+    }
+
+    /// Select the high/low input logic thresholds
+    ///
+    /// Preserves the register's shutdown, scan, and open/short detection settings.
+    pub fn set_logic_threshold(&mut self, threshold: LogicThreshold) -> Result<(), I2C::Error> {
+        let v = self.read_register(Page::Config, 0)?;
+        self.write_register(Page::Config, 0, (v & !8) | threshold as u8)
     }
 
     fn write(&mut self, buf: &[u8]) -> Result<(), I2C::Error> {
@@ -260,4 +311,37 @@ pub enum SwSetting {
     Sw1Sw2 = 0b0111,
     // All CSx pins only act as current sink, no scanning
     NoScan = 0b1000,
+}
+
+/// Pull resistance used by [`IS31FL3741::set_deghost_resistors`].
+#[derive(Clone, Copy, Debug)]
+#[repr(u8)]
+pub enum Resistor {
+    Disabled = 0,
+    Ohms500 = 1,
+    KiloOhms1 = 2,
+    KiloOhms2 = 3,
+    KiloOhms4 = 4,
+    KiloOhms8 = 5,
+    KiloOhms16 = 6,
+    KiloOhms32 = 7,
+}
+
+/// LED fault flags read from the interrupt status register.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InterruptStatus {
+    /// An LED open fault occurred.
+    pub open: bool,
+    /// An LED short fault occurred.
+    pub short: bool,
+}
+
+/// High/low input logic thresholds selected by the LGC configuration bit.
+#[derive(Clone, Copy, Debug)]
+#[repr(u8)]
+pub enum LogicThreshold {
+    /// High at 1.4 V or above; low at 0.4 V or below (reset default).
+    High1V4Low0V4 = 0,
+    /// High at 2.4 V or above; low at 0.6 V or below.
+    High2V4Low0V6 = 8,
 }
