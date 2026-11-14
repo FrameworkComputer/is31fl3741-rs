@@ -26,8 +26,8 @@ To use a preconfigured device ([Framework LED Matrix](https://frame.work/tw/en/p
 you would need to change this line to include that device:
 
 ```toml
-is31fl3741 = { version = "0.4.0", features = ["framework_ledmatrix"] }
-is31fl3741 = { version = "0.4.0", features = ["adafruit_rgb_13x9"] }
+is31fl3741 = { version = "0.5.0", features = ["framework_ledmatrix"] }
+is31fl3741 = { version = "0.5.0", features = ["adafruit_rgb_13x9"] }
 ```
 
 ## Graphics
