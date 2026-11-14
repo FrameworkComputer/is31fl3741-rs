@@ -120,10 +120,11 @@ impl<I2C: I2c> IS31FL3741<I2C> {
 
     /// Put the device into software shutdown mode
     pub fn shutdown(&mut self, yes: bool) -> Result<(), I2C::Error> {
+        let config_register = self.read_register(Page::Config, addresses::CONFIG_REGISTER)?;
         self.write_register(
             Page::Config,
             addresses::CONFIG_REGISTER,
-            if yes { 0 } else { 1 },
+            (config_register & !1) | if yes { 0 } else { 1 },
         )?;
         Ok(())
     }
