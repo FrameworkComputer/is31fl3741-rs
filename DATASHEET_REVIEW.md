@@ -28,14 +28,297 @@ Update this checklist as each item progresses, in the same commit as the change 
 
 ## Implementation plan
 
-I have one framework led matrix connected, with the example running. You can use the bootloader interface to reset and flash it.
-See ~/clone/inputmodule-rs for tools and instructions.
+The user authorized reset/bootloader entry and flashing for the supplied Framework
+LED Matrix; re-identify it before every hardware session. Hardware/tool setup is
+also documented in `~/clone/inputmodule-rs` and the checked-in Framework README.
 
-For each item:
+For each issue: establish the unmodified baseline, implement narrowly, test the
+fix with the same host/hardware assertions, restore state, update this checklist,
+and commit separately with only actual validation evidence. Follow the detailed
+workflow below; do not treat compilation as a hardware behavioral baseline.
 
-- Test without the fix first, to get a baseline
-- Test the fix
-- Update this checklist with the actual result and remaining gaps, then commit. The message must include how it was tested, but only what actually ran. No hypotheticals.
+## Repeatable issue workflow
+
+This is the handoff procedure for continuing with the same rigor. Runbook
+commands below are instructions, not additional claims of tests already run.
+The results beside each checklist item and in the hardware records are the
+actual evidence. Do not depend on session-local `/tmp` scripts; those are not
+part of the retained harness.
+
+### 1. Define the issue and preserve the baseline
+
+- Work on one issue at a time. Identify the datasheet page/table and concrete
+  expected behavior, current implementation, affected public contract, and
+  applicable host/hardware checks before editing driver code.
+- Inspect `git status` and preserve unrelated changes. Record the baseline
+  commit, any uncommitted differences, compiler version, profile, and relevant
+  dependency lockfile. Keep baseline and fixed builds in separate directories.
+- Add the focused regression test/diagnostic first. Run it against the unmodified
+  implementation on the host **and on the Framework hardware where applicable**.
+  Save the exact command, output, and exit/result. A failure must be the expected
+  behavioral failure, not an unrelated compiler/linker/USB error.
+- Use the same test, diagnostic source, build profile, inputs, bus/clock settings,
+  and board for before/after comparisons. When historical examples lack USB test
+  dependencies, copy only the harness and necessary example manifest/lockfile;
+  record that adaptation. Do not backport the production fix into the baseline.
+- For already-committed fixes, replay the parent and fixed revisions in isolated
+  checkouts and label the evidence as a later replay. Never imply that later
+  hardware validation happened before the original commit.
+
+Example: reproduce the invalid-page host regression from before `8028a9b`.
+Run from the repository root; choose a fresh baseline directory:
+
+```sh
+baseline_dir=$(mktemp -d /tmp/is31-before-invalid-page.XXXXXX)
+git worktree add --detach "$baseline_dir" f5f6f49
+cp tests/core.rs "$baseline_dir/tests/core.rs"
+cp tests/support/mod.rs "$baseline_dir/tests/support/mod.rs"
+(cd "$baseline_dir" && cargo test --all-features --test core \
+  invalid_mapping_pages_are_rejected_without_bus_access -- --exact)
+```
+
+Expected baseline: the test fails because page2 is accepted. On the fixed driver
+it passes. For a future issue, use its own parent/test and copy any required
+support files; check that a failure really corresponds to that issue. Retain
+logs before removing a baseline checkout. Never reset the working checkout to
+obtain the old implementation.
+
+Different issue types require different baseline evidence:
+
+| Type | Valid baseline and follow-up |
+| --- | --- |
+| Behavior bug | Expected host/hardware failure before, same assertion passes after. |
+| Missing API | Record absence separately. A missing-method compile failure is not an on-device runtime baseline. Exercise actual register/event behavior after implementation; explicitly identify any hardware baseline that could not be established. Do not invent a no-op “old implementation.” |
+| Optimization | Correctness may pass both versions. Measure the original cost, repeat an identical workload afterward, and preserve mappings/output/error behavior. Do not manufacture a correctness failure. |
+| Documentation | Inspect the inaccurate/missing wording first, cross-check source/datasheet, then review/build the correction. Do not invent a runtime or hardware failure for wording changes. |
+| Test/tool improvement | Run the previous suite/tool first. Demonstrate a real coverage/acceptance/recovery gap if one exists; distinguish added coverage from a fixed driver defect. |
+
+### 2. Implement narrowly and retain regression coverage
+
+- Make the smallest change that satisfies the expected behavior. Preserve existing
+  public interfaces/defaults unless a decision has been made explicitly. Leave
+  open contract/ownership questions unchecked rather than silently choosing a
+  new design while the user is away.
+- Put public-behavior host tests in `tests/core.rs`, Adafruit/graphics checks in
+  `tests/adafruit.rs`, and mapping compatibility in `tests/mapping.rs`. Reuse
+  `tests/support/mod.rs` for recorded writes, read values, and transaction failures.
+- Check boundaries, both register pages and their final channels, reserved-bit
+  masks, preservation of unrelated fields, and error propagation. For multi-step
+  I²C operations, inject a failure at **each** transaction and check that no
+  unintended subsequent writes occur. Check invalid inputs cause no bus access.
+- Preserve independent expected results. Frozen mapping CSVs establish compatibility
+  with the reviewed mapping, not correctness against an unseen PCB. Do not update
+  a fixture solely to make a changed implementation pass.
+- Extend `examples/ledmatrix/examples/hardware_check.rs` with a focused command
+  when a hardware regression needs it. Report each API separately; never hide a
+  failing assertion behind a generic combined PASS. Label exploratory measurements
+  `OBS`, not PASS, until there is a defined acceptance condition.
+
+### 3. Validate the fix on the host and target
+
+Run the focused test first, then the relevant shared checks. Current full host
+matrix (repository root):
+
+```sh
+cargo test --all-features
+cargo test --all-features --release
+cargo test --no-default-features
+cargo test --no-default-features --features framework_ledmatrix
+cargo test --no-default-features --features adafruit_rgb_13x9
+cargo test --no-default-features --features adafruit_rgb_13x9,embedded_graphics
+cargo clippy --all-features --all-targets -- -D warnings
+cargo clippy --no-default-features --all-targets -- -D warnings
+cargo doc --all-features --no-deps
+cargo fmt --all --check
+git diff --check
+cargo build --target thumbv6m-none-eabi --all-features
+```
+
+For diagnostic/firmware changes, from `examples/ledmatrix`:
+
+```sh
+cargo clippy --release --example hardware_check -- -D warnings
+cargo build --release --example hardware_check && \
+  elf2uf2-rs target/thumbv6m-none-eabi/release/examples/hardware_check hardware_check.uf2
+```
+
+Keep build and conversion dependent (`&&`): a failed build must not lead to
+flashing an older binary left in `target/`. Use the same profile before/after;
+release is required for performance comparisons. Do not call a successful
+cross-build proof that firmware ran. The historical Adafruit example build had
+linker warnings about missing `_start`; no Adafruit runtime validation is claimed.
+See [host test instructions](tests/README.md) and
+[mapping measurement methodology](measurements/README.md).
+
+### 4. Run controlled hardware checks and restore state
+
+Re-identify the intended board and serial device before every flash. The recorded
+application is USB `32ac:0020`; bootloader is `2e8a:0003` with volume `RPI-RP2`.
+Do not assume `/dev/ttyACM0` still belongs to the matrix. Inspect `/dev/serial/by-id`
+and USB enumeration; record board revision/IC marking if actually inspected.
+Otherwise retain “unknown/uninspected.” Follow the
+[Framework build/bootloader/flash instructions](examples/ledmatrix/README.md).
+If desktop automount is inactive, identify and mount the **RPI-RP2** volume
+explicitly (for example `udisksctl mount -b /dev/disk/by-label/RPI-RP2`); never
+substitute an arbitrary block device. Wait for application re-enumeration and
+serial permissions to settle after flashing. Record mount/serial failures as
+infrastructure failures, not test outcomes.
+
+The diagnostic accepts single ASCII commands at 115200 baud:
+
+| Command | Report/effect |
+| --- | --- |
+| `F` | One PASS/FAIL: complete 351-channel PWM write/readback. |
+| `C` | One PASS/FAIL: coordinates/corners, skipping the frame check so an old frame bug cannot mask a bounds bug. |
+| `T`, `S` | One PASS/FAIL: frame, bounds, shutdown/resume sequence. |
+| `A` | Five independent lines: GCC, resistors, logic, IRQ mask ACK, IRQ status access. The last two alone do not validate events. |
+| `G`, `R`, `L`, `M`, `I` | One API check from `A`. |
+| `X` | Expected deliberate failure with verified restoration; then repeat `A`/`T` without resetting. |
+| `U` | Setup zero-PWM/scaling contract, explicit scaling, and verified restoration. |
+| `V` | Invalid mapping pages2/255 rejected, PWM unchanged, callback/state restored. |
+| `P` | Release mapping-only timer and checksum; excludes I²C/USB. |
+| `E` | Four observation lines: masked open, latched open, auto-clear open, latched short. |
+| `Q` | Three drive-level controls for open detection. |
+| `0`–`6` | Hold optical patterns; **not** automatically restored after a successful command. |
+| `Z` | Restore the state saved before the optical sequence. |
+
+For a manual diagnostic query on Linux, this recipe needs only Python's standard
+library. Set `MATRIX_PORT` to the verified device; `A` expects five complete lines.
+Change the command/count for other rows of the table and save the full output:
+
+```sh
+MATRIX_PORT=/dev/ttyACM0  # example only: verify the actual device first
+python3 - "$MATRIX_PORT" A 5 <<'PY'
+import os, select, sys, termios, time
+fd = os.open(sys.argv[1], os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+original = termios.tcgetattr(fd)
+try:
+    settings = termios.tcgetattr(fd)
+    settings[0] = settings[1] = settings[3] = 0
+    settings[2] = termios.CS8 | termios.CREAD | termios.CLOCAL
+    settings[4] = settings[5] = termios.B115200
+    termios.tcsetattr(fd, termios.TCSANOW, settings)
+    termios.tcflush(fd, termios.TCIFLUSH)
+    os.write(fd, sys.argv[2].encode('ascii'))
+    data = b''
+    deadline = time.monotonic() + 10
+    while data.count(b'\n') < int(sys.argv[3]) and time.monotonic() < deadline:
+        if select.select([fd], [], [], 0.1)[0]:
+            data += os.read(fd, 4096)
+    print(data.decode(), end='')
+    if data.count(b'\n') != int(sys.argv[3]):
+        raise SystemExit('Missing/extra diagnostic report lines')
+finally:
+    termios.tcsetattr(fd, termios.TCSANOW, original)
+    os.close(fd)
+PY
+```
+
+This reader checks completeness, **not correctness**. Compare each report with
+the expected result; `X` intentionally says FAIL, other unexpected FAIL lines
+must not be accepted. Use the retained interrupt checker for event assertions.
+Repeat focused fixed checks at least three consecutive times, and run relevant
+normal checks afterward (for example `V`, `T`, `A`, `U`). An initial failure can
+contaminate subsequent checks: preserve the first failure and state effects,
+restore/reinitialize, and do not describe later initial-state failures as three
+independent reproductions of the same assertion.
+
+Diagnostics must snapshot the state they change and restore on success **and**
+failure, then verify readback. Current snapshots cover PWM, scaling, configuration,
+GCC, resistor selection, and PWM frequency. Restore a changed callback too.
+Attempt remaining cleanup operations if one fails; report uncertain state if
+writes or verification fail. The write-only interrupt mask is owned by the
+diagnostic and returned to disabled, not read back or restored from an arbitrary
+prior value. Fault/status history is read-only and cannot be restored: I (including A)
+can acknowledge status, E/Q generate/acknowledge events and replace results,
+and U resets history. Keep these exceptions in reports/docs.
+Physical bus-disconnection recovery has not been demonstrated.
+
+At the end, send `Z` if optical modes were used, build/convert/flash normal
+`ledtest` with the intended final driver, and verify application re-enumeration.
+Restore camera settings and read them back. Do not record “restored” while the
+flash/mount/control operation is merely pending or has timed out.
+
+### 5. Use evidence appropriate to the claim
+
+- **Register behavior:** read back the complete affected range, including page
+  boundaries/unmapped channels, and compare independent expected data. A visible
+  pattern alone cannot catch PG1 `0xAA`, which is unused on the Framework board.
+- **Interrupts/detection:** use `scripts/check_interrupts.py` from the Framework
+  example directory with a fresh output JSON. E/Q observations are specific to
+  this board/settings. Full PWM/scaling at GCC1 produced six active opens;
+  SW9 is disabled. A status read acknowledged flags/released INTB. Auto-clear was
+  sampled low at 1ms/high by 12ms, not measured as an exact 8ms interval. The
+  256-channel short bitmap is unresolved, not evidence of 256 physical shorts.
+  Do not use an empty bitmap as a passing event test or infer guaranteed completion.
+- **Optical behavior:** use `scripts/capture_optical.py`; verify framing, start
+  with dark mode0, lock exposure/white balance, keep pattern/settings constant,
+  repeat resistor conditions, retain cropped frames and clipping metrics, and
+  restore camera/matrix in cleanup. The visibility guard must reject a lit pattern
+  missing from the crop. RGB means are not calibrated luminance; clipped cores,
+  bloom, and reflections limit conclusions. No conclusive difference is not
+  evidence that ghosting was eliminated. See both retained optical comparisons.
+- **Performance:** use `measurements/measure_mapping.py` and release `P` with the
+  same toolchain/workload. Check checksums/frozen mappings before accepting gains.
+  Compare linked firmware size too: probe objects omit external static tables.
+  Distinguish local stack reservation from whole-program stack and mapping-only
+  timing from end-to-end I²C display throughput.
+- **Coverage limits:** Framework hardware does not validate Adafruit wiring/colors.
+  Digital configuration readback does not measure analog logic thresholds. Do
+  not introduce physical shorts or remove LEDs on the working board for a test.
+
+### 6. Record, update, then commit one issue
+
+Keep source tests/diagnostics and concise results in version control. Store host
+regressions in `tests/`, measurements under `measurements/`, and dated hardware
+records/cropped evidence under `examples/ledmatrix/test-results/`. Append actual
+runs to `examples/ledmatrix/HARDWARE_TEST_RESULTS.md`; keep prior records intact.
+Generated binaries, raw full-scene camera frames, build caches, and temporary
+logs stay untracked. Never overwrite a baseline report with the fixed output.
+
+Use this evidence template for each item/run:
+
+```text
+Issue / datasheet reference:
+Baseline driver commit + uncommitted changes:
+Fixed driver commit or precise working-tree diff:
+Harness commit + any copied manifest/lockfile adaptations and lockfile hash:
+Built/flashed firmware path and SHA-256 (for example sha256sum hardware_check.uf2):
+Toolchain/profile / board identity (unknown if uninspected):
+I2C speed / scan rows / PWM / GCC / scaling / resistor settings:
+Exact baseline command, observed result, exit code or serial report:
+Exact fixed command, observed result, repeat count:
+Broader checks actually executed:
+Raw/cropped evidence paths:
+Cleanup attempted and restoration actually verified:
+Remaining limits / decisions:
+```
+
+Update the issue's checkbox and Status in this file **in the same commit** as the
+fix/evidence. Cite commits and results; distinguish implementation completion
+from separate efficacy/physical-validation questions. Keep incomplete work
+unchecked with an explicit reason. Update the current-state summary when the
+implementation/test totals change, keeping historical counts attached to their
+original steps. Do not claim an actual CI run when only workflow commands ran locally.
+
+Commit the fix together with its persistent regression and checklist/evidence
+(one issue per commit; harness-only changes can be their own passing commit).
+Do not commit a knowingly failing regression alone to the main branch. Suggested
+commit body structure, filled with actual outcomes only:
+
+```text
+Baseline: <revision, command, actual expected failure or measured cost>.
+After: <command, actual result and hardware repeat count>.
+Checks: <only checks actually executed>.
+Hardware/evidence: <board/settings/report path; actual limits>.
+Cleanup: <what was restored and how verified>.
+```
+
+If baseline evidence or hardware verification is unavailable, say so plainly in
+the checklist and commit; never fill this template with anticipated results.
+Retest after further code changes invalidate earlier results. Once relevant
+checks pass, do not repeat unrelated tests without a new change or unresolved
+concern. Finish with `git status --short` and report any remaining changes.
 
 ## Test approach
 
@@ -43,7 +326,7 @@ Use a recording/scripted `embedded_hal::i2c::I2c` mock for register transactions
 
 Use the existing `examples/ledmatrix` RP2040 firmware as the starting point for a hardware diagnostic. It already selects `Sw1Sw8`, matching the Framework mapping. The persistent `hardware_check` example reports test results over USB serial and uses diagnostic-local I²C reads; driver register helpers remain private. Any diagnostic page selection must use the unlock sequence and restore state or reinitialize between cases.
 
-Before flashing, identify the attached board and firmware recovery path, confirm its chip marking/revision against this **A** datasheet, and choose modest scaling/GCC for visible tests. Firmware flashing and register tests have been performed; physical fault injection has not. Physical chip marking and board revision remain uninspected. Register readback and optical observation complement mock tests; they do not replace them. Framework hardware does not validate Adafruit-specific layout behavior.
+Before flashing, identify the attached board and firmware recovery path, record its chip marking/revision against this **A** datasheet if accessible (otherwise explicitly uninspected), and choose modest scaling/GCC for visible tests. Firmware flashing and register tests have been performed; physical fault injection has not. Physical chip marking and board revision remain uninspected. Register readback and optical observation complement mock tests; they do not replace them. Framework hardware does not validate Adafruit-specific layout behavior.
 
 Record firmware revision, board revision, settings, expected/observed values, and pass/fail for each hardware run. Leave items unchecked until their implementation/documentation resolution and relevant checks are complete; explicitly record hardware checks that remain unavailable.
 
@@ -279,6 +562,8 @@ Transaction counts are source-level estimates, not measured speedups. Resolve co
 5. Pursue de-ghost efficacy and physical short diagnosis only with a reproducible fault/optical baseline. They are not demonstrated fixes awaiting an unchecked implementation step.
 
 ## Regression coverage and diagnostic follow-up
+
+- [x] Document the repeatable issue workflow for handoff. Includes baseline/replay rules, host and hardware checks, checked-in tool/command inventory, restoration and evidence limits, per-issue evidence template, and factual commit requirements. Validated four shell snippets with `bash -n`, embedded Python with `compile`, local links/harness paths, referenced commits, and `git diff --check`. Documentation only; no new runtime or hardware validation claimed.
 
 - [x] Strengthen register API host coverage. Baseline: existing 18 tests passed. After adding exhaustive parameter, preservation, and per-transaction failure checks: 23 all-feature tests pass in debug/release; 21 pass without default features; strict host Clippy passes. This is coverage expansion, not a demonstrated driver bug fix. No additional hardware test was run for this host-only change.
 - [x] Report each diagnostic API independently and restore state after failures. Baseline: old `A` gave one combined line; historical shutdown failure contaminated subsequent requests. Revised hardware: three `X` deliberate failures restored state, then `A X A T A` returned distinct API lines and successful reruns with verified restoration. Strict diagnostic Clippy and build pass. Physical bus disconnection was not tested; cleanup errors explicitly report uncertain state. See hardware run record.
